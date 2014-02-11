@@ -122,14 +122,14 @@ printf("\nHONEYPOT MODE\n\n");
 printf("	The '-honeypot' argument invokes a special mode in which Paranoid TelnetD will pretend to authenticate users, but will never accept any credentials as valid. It also logs everything as 'critical'. This provides a kind of poor-person's honeypot, as Paranoid TelnetD can be installed on systems that no-one should ever telnet into, and the logs watched for 'critical' error messages coming out of ptelnetd.\n");
 
 printf("\nINETD\n\n");
-printf("		If run out of inetd then obviously interface and port cannot be specified, nor will a pid file be created.\n");
+printf("	If run out of inetd then obviously interface and port cannot be specified, nor will a pid file be created.\n");
 
 printf("\nEXAMPLES\n\n");
 printf("    %s\n          %s\n\n","ptelnetd -auth-methods pam -chhome","Allow users to log in 'for real' but jail them in their home directories");
 printf("    %s\n          %s\n\n","ptelnetd -auth-methods pam -chhome -dynhome '/home/$(User)-$(ClientIP)'","Allow users to log in 'for real' but jail them in a dynamically created home directory\n");
-printf("    %s\n          %s\n\n","		ptelnetd -real-user nobody -chhome -dynhome '/home/$(User)-$(ClientIP)'	-allow-ips 192.168.[2-3].*,10.0.0.[1-5]","Allow users to login against username/passwords in the native file (/etc/ptelnted.auth). All users will run as the real user 'nobody'. Each user will be jailed in a dynamically created directory. Only allow logins from ipranges 192.168.1.x and 192.168.3.x and 10.0.0.1 to 10.0.0.5\n");
-printf("    %s\n          %s\n\n","		ptelnetd -auth-methods pam -allow-macs d0:b:bd:63:94:f1","Allow users to login as 'real users' using Pluggable Authentication Modules, but only from one mac address");
-printf("    %s\n          %s\n\n","		ptelnetd -auth-methods open -chroot /home/mud -shell './mud-server'","ALLOW ANYONE IN WITHOUT AUTHENTICATION. Jail everything into /home/mud. Run the program 'mud-server' as the shell");
+printf("    %s\n          %s\n\n","ptelnetd -real-user nobody -chhome -dynhome '/home/$(User)-$(ClientIP)'	-allow-ips 192.168.[2-3].*,10.0.0.[1-5]","Allow users to login against username/passwords in the native file (/etc/ptelnted.auth). All users will run as the real user 'nobody'. Each user will be jailed in a dynamically created directory. Only allow logins from ipranges 192.168.1.x and 192.168.3.x and 10.0.0.1 to 10.0.0.5\n");
+printf("    %s\n          %s\n\n","ptelnetd -auth-methods pam -allow-macs d0:b:bd:63:94:f1","Allow users to login as 'real users' using Pluggable Authentication Modules, but only from one mac address");
+printf("    %s\n          %s\n\n","ptelnetd -auth-methods open -chroot /home/mud -shell './mud-server'","ALLOW ANYONE IN WITHOUT AUTHENTICATION. Jail everything into /home/mud. Run the program 'mud-server' as the shell");
 
 exit(0);
 }

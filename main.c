@@ -13,6 +13,12 @@
 #define USER_DEL 2
 #define USER_LIST 3
 
+//Older linux systems will lack 'lazy unmounts' (MNT_DETACH)
+//so catch this and handle it here
+#ifndef MNT_DETACH
+#define MNT_DETACH 0
+#endif
+
 
 char *SessionSubstituteVars(char *RetStr, char *Format, TSession *Session)
 {

@@ -60,18 +60,34 @@ DestroyString(Value);
 
 void OAuthParseJSON(char *JSON, ListNode *Vars)
 {
-char *ptr, *dptr, *Name=NULL,*Value=NULL;
+char *ptr, *ptr2, *Token=NULL, *Name=NULL, *Value=NULL;
 
+StripLeadingWhitespace(JSON);
+StripTrailingWhitespace(JSON);
 ptr=JSON+StrLen(JSON)-1;
-if (*ptr==',') *ptr='\0';
-
-ptr=GetToken(JSON," :",&Name,GETTOKEN_QUOTES);
-ptr=GetToken(ptr," :",&Value,GETTOKEN_QUOTES);
-
+if (*ptr=='}') *ptr='\0';
+ptr=JSON;
+if (*ptr=='{') ptr++;
+ptr=GetToken(ptr,",",&Token,0);
+while (ptr)
+{
+printf("TOK: %s\n",Token);
+ptr2=GetToken(Token,":",&Name,0);
+StripTrailingWhitespace(Name);
+StripQuotes(Name);
+ptr2=GetToken(ptr2,":",&Value,GETTOKEN_QUOTES);
+StripLeadingWhitespace(Value);
+StripTrailingWhitespace(Value);
+StripQuotes(Value);
+printf("JSON: %s=%s\n",Name,Value);
 SetVar(Vars,Name,Value);
+ptr=GetToken(ptr,",",&Token,0);
+}
 
-DestroyString(Value);
+
 DestroyString(Name);
+DestroyString(Value);
+DestroyString(Token);
 }
 
 
@@ -93,14 +109,16 @@ S=HTTPMethod("POST",Tempstr,"","");
 
 if (S)
 {
+Encode=CopyStr(Encode,"");
 Tempstr=STREAMReadLine(Tempstr,S);
 while (Tempstr)
 {
 StripTrailingWhitespace(Tempstr);
-printf("OA: %s\n",Tempstr);
-OAuthParseJSON(Tempstr, Vars);
+Encode=CatStr(Encode,Tempstr);
 Tempstr=STREAMReadLine(Tempstr,S);
 }
+
+OAuthParseJSON(Encode, Vars);
 
 *NextURL=CopyStr(*NextURL,GetVar(Vars,"verification_url"));
 *DeviceCode=CopyStr(*DeviceCode,GetVar(Vars,"device_code"));
@@ -191,12 +209,12 @@ DestroyString(Encode);
 
 
 
-void OAuthInstalledAppURL(char *LoginURL, char *ClientID, char *Scope, char **NextURL)
+void OAuthInstalledAppURL(char *LoginURL, char *ClientID, char *Scope, char *RedirectURL, char **NextURL)
 {
 char *Encode=NULL;
 
 Encode=HTTPQuote(Encode,ClientID);
-*NextURL=MCopyStr(*NextURL,LoginURL,"?response_type=code&redirect_uri=urn:ietf:wg:oauth:2.0:oob&client_id=",Encode,NULL);
+*NextURL=MCopyStr(*NextURL,LoginURL,"?response_type=code&redirect_uri=",RedirectURL,"&client_id=",Encode,NULL);
 Encode=HTTPQuote(Encode,Scope);
 *NextURL=MCatStr(*NextURL,"&scope=",Encode,NULL);
 
@@ -205,7 +223,7 @@ DestroyString(Encode);
 }
 
 
-void OAuthInstalledAppGetAccessToken(char *TokenURL, char *ClientID, char *ClientSecret, char *AuthCode, char **AccessToken, char **RefreshToken)
+void OAuthInstalledAppGetAccessToken(char *TokenURL, char *ClientID, char *ClientSecret, char *AuthCode, char *RedirectURL, char **AccessToken, char **RefreshToken)
 {
 char *Tempstr=NULL, *Encode=NULL;
 ListNode *Vars=NULL;
@@ -216,7 +234,7 @@ Vars=ListCreate();
 Tempstr=MCopyStr(Tempstr,TokenURL,"?client_id=",ClientID,NULL);
 Tempstr=MCatStr(Tempstr,"&client_secret=",ClientSecret,NULL);
 Tempstr=MCatStr(Tempstr,"&code=",AuthCode,NULL);
-Tempstr=MCatStr(Tempstr,"&redirect_uri=urn:ietf:wg:oauth:2.0:oob",NULL);
+Tempstr=MCatStr(Tempstr,"&redirect_uri=",RedirectURL,NULL);
 Tempstr=MCatStr(Tempstr,"&grant_type=","authorization_code",NULL);
 
 S=HTTPMethod("POST",Tempstr,"","");
