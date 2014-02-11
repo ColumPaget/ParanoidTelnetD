@@ -461,9 +461,11 @@ int CheckClientPermissions(TSession *Session)
 int RetVal=TRUE;
 
 
+if (StrLen(Settings.AllowIPs) || StrLen(Settings.AllowMACs)) RetVal=FALSE;
+
+
 if (StrLen(Settings.AllowIPs))
 {
-	RetVal=FALSE;
 	if (FnmatchInList(Settings.AllowIPs, Session->ClientIP)) RetVal=TRUE;
 }
 
@@ -478,7 +480,6 @@ if (StrLen(Settings.DenyIPs))
 
 if (StrLen(Settings.AllowMACs))
 {
-	RetVal=FALSE;
 	if (FnmatchInList(Settings.AllowMACs, Session->ClientMAC)) RetVal=TRUE;
 }
 

@@ -3,9 +3,18 @@ Author: Colum Paget
 Email: colums.projects@gmail.com
 Blog: http://idratherhack.blogspot.com
 
+DISCLAIMER:
+
+  This is free software. It comes with no guarentees and I take no responsiblity if it makes your computer explode or opens a portal to the demon dimensions, or does anything. It is released under the Gnu Public Licence.
+
+SYNOPSIS:
+
 ptelnetd (Paranoid Telnet Daemon) is a telnet server intended to be used with embedded or commodity hardware that communicates over telnet. ptelnetd has its own authentication system, so that usernames/passwords can be used that are unique to ptelnetd, and cannot be used to log into the main system. When used with this 'native' authentication ptelnetd cannot log in users against accounts that are not listed in it's authentication file, thus limiting logins to those usernames/passwords set up for use with ptelnetd, and potentially only with ptelentd. Ptelnetd supports two types of chroot jail, blacklisting/whitelisting of users, ip-addresses and mac-addresses, and many other features intended to make the insecure telnet protocol as secure as possible.
 
-Usage: ptelnetd <options>
+USAGE: 
+
+	ptelnetd <options>
+
 Options:
 -?                                This help
 -help                             This help

@@ -30,3 +30,6 @@ common.o: common.c common.h
 clean:
 	rm -f *.o */*.o */*.a */*.so $(EXE)
 
+install:
+	@mkdir -p /usr/sbin
+	cp -f ptelnetd /usr/sbin
