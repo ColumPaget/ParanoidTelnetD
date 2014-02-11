@@ -1,0 +1,32 @@
+
+CC = @CC@
+VERSION = @VERSION@
+CFLAGS = @CFLAGS@
+LIBS = @LIBS@
+INSTALL=@INSTALL@
+prefix=@prefix@
+bindir=$(prefix)@bindir@
+FLAGS=$(CFLAGS) @DEFS@
+OBJ=Authenticate.o common.o telnet-protocol.o settings.o 
+EXE=ptelnetd
+
+all: $(OBJ) main.c
+	@cd libUseful-2.0; $(MAKE)
+	gcc -g $(LIBS) -o$(EXE) $(OBJ) main.c libUseful-2.0/libUseful-2.0.a
+
+
+Authenticate.o: Authenticate.c Authenticate.h
+	gcc -g $(FLAGS) -c Authenticate.c
+
+settings.o: settings.c settings.h
+	gcc -g $(FLAGS) -c settings.c
+
+telnet-protocol.o: telnet-protocol.c telnet-protocol.h
+	gcc -g -c telnet-protocol.c
+
+common.o: common.c common.h
+	gcc -g -c common.c
+
+clean:
+	rm -f *.o */*.o */*.a */*.so $(EXE)
+
