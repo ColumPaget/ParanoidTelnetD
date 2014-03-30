@@ -31,7 +31,8 @@ printf("%-33s %s","--version","Version info\n");
 printf("%-33s %s","-p <port>","Port to run service on\n");
 printf("%-33s %s","-port <port>","Port to run service on\n");
 printf("%-33s %s","-pid-file <path>","Path to pid file. Can contain variables (See 'VARIABLES') below.\n");
-printf("%-33s %s","-i <interface>","Restrict service to a particular network interface (eth0, eth1, etc).\n");
+printf("%-33s %s","-i <interface>","Restrict service to a particular network interface.\n");
+printf("		 Either address or interface (eth0, eth1, etc) for IPv4. Full scoped address for IPv6.\n");
 printf("%-33s %s","","Thus different ptelnetds with different configs can be set on different interfaces\n");
 printf("%-33s %s","-D","Don't demonize/fork into background.\n");
 printf("%-33s %s","-nodemon","Don't demonize/fork into background.\n");
@@ -56,6 +57,7 @@ printf("%-33s %s","-debug","Extra logging for debugging\n");
 printf("%-33s %s","-error-log-level <syslog level>","syslog level (debug,info,notice,warn,error,crit) to use for error logging\n");
 printf("%-33s %s","-info-log-level <syslog level>","syslog level (debug,info,notice,warn,error,crit) to use for informational logging\n");
 printf("%-33s %s","-banner <text>","Text to display when a client connects. 'text' can contain variables. See 'VARIABLES' below.\n");
+printf("%-33s %s","-idle <seconds>","Session idle timeout in seconds.\n");
 printf("%-33s %s","-chroot <directory>","Chroot into directory before doing anything else. 'directory' can contain variables. See 'VARIABLES' below.\n");
 printf("%-33s %s","-dynhome <directory>","Dynamically generate home directories. 'directory' can contain variables. See 'VARIABLES' below.\n");
 printf("%-33s %s","-chhome","After login chroot into the user's home directory.\n");
@@ -147,11 +149,13 @@ Settings.Interface=CopyStr(Settings.Interface,"");
 Settings.Port=23;
 Settings.AuthDelay=3;
 Settings.AuthTries=3;
+Settings.IdleTimeout=3600;
 Settings.AuthMethods=CopyStr(Settings.AuthMethods,"native");
 Settings.AuthFile=CopyStr(Settings.AuthFile,"/etc/ptelnetd.auth");
 Settings.Shell=CopyStr(Settings.Shell,"/bin/sh");
 Settings.LogPath=CopyStr(Settings.LogPath,"/var/log/telnetd.log");
-Settings.BindMounts=CopyStr(Settings.BindMounts,"/bin/,/lib/,/usr/lib/");
+Settings.BindMounts=CopyStr(Settings.BindMounts,"");
+Settings.PidFile=CopyStr(Settings.PidFile,"/var/run/ptelnetd-$(Interface)-$(ServerPort).pid");
 Settings.BlockHosts=ListCreate();
 for (i=0; DefaultUsers[i] !=NULL; i++)
 {
@@ -162,7 +166,7 @@ for (i=0; DefaultUsers[i] !=NULL; i++)
 			}
 }
 
-Settings.ChDir=CopyStr(Settings.ChDir,"/tmp/");
+Settings.ChDir=CopyStr(Settings.ChDir,"/var/empty/");
 }
 
 
@@ -254,6 +258,7 @@ void SettingsParseCommandLine(int argc, char *argv[])
 {
 int i;
 
+if (argc < 2) return;
 if (strcmp("-user", argv[1])==0) SettingsParseUserCommandLine(argc, argv);
 else
 {
@@ -277,7 +282,7 @@ for (i=1; i < argc; i++)
 	else if (strcmp("-debug", argv[i])==0) Settings.Flags |= FLAG_DEBUG;
 	else if (strcmp("-honeypot", argv[i])==0) 
 	{
-			Settings.Flags |= FLAG_DENYAUTH;
+			Settings.Flags |= FLAG_DENYAUTH | FLAG_HONEYPOT;
 			Settings.AuthMethods=CopyStr(Settings.AuthMethods,"");
 			Settings.AuthFile=CopyStr(Settings.AuthFile,"");
 			Settings.InfoLogLevel=LOG_CRIT;
@@ -310,6 +315,7 @@ for (i=1; i < argc; i++)
 	else if (strcmp("-inetd", argv[i])==0) Settings.Flags |= FLAG_INETD;
 	else if (strcmp("-D", argv[i])==0) Settings.Flags |= FLAG_NODEMON;
 	else if (strcmp("-nodemon", argv[i])==0) Settings.Flags |= FLAG_NODEMON;
+	else if (strcmp("-idle", argv[i])==0) Settings.IdleTimeout=atoi(argv[++i]);
 	else if (strcmp("-shell", argv[i])==0)
 	{
 		Settings.Shell=CopyStr(Settings.Shell,argv[++i]);

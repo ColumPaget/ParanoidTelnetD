@@ -19,6 +19,9 @@
 #define MNT_DETACH 0
 #endif
 
+int g_argc;
+char **g_argv;
+int PidFile;
 
 char *SessionSubstituteVars(char *RetStr, char *Format, TSession *Session)
 {
@@ -95,6 +98,7 @@ if ((Settings.Flags & FLAG_LOCALONLY) && (! StrLen(Session->ClientMAC)))
 {
 	syslog(Settings.ErrorLogLevel,"%s@%s NOT LOCAL. Denying Login.",Session->User,Session->ClientIP);
 }
+else if (Settings.Flags & FLAG_HONEYPOT) syslog(Settings.ErrorLogLevel,"%s@%s login denied (honeypot mode): user=%s pass=%s",Session->User,Session->ClientIP,Session->User,Session->Password);
 else if (
 					(! (Session->Flags & FLAG_DENYAUTH)) &&
 					(Authenticate(Session, AUTH_ANY))
@@ -292,9 +296,11 @@ char *Tempstr=NULL;
 int result, fd;
 ListNode *Streams;
 struct passwd *pwent;
-time_t Duration, Start;
+struct timeval tv;
+time_t Duration, Start, Now, LastActivity;
 
 time(&Start);
+LastActivity=Start;
 Streams=ListCreate();
 ListAddItem(Streams,Session->S);
 
@@ -317,7 +323,7 @@ if (StrLen(Session->RealUser))
 //anything read from password files
 if (Settings.Flags & FLAG_FORCE_SHELL)
 {
-Session->Shell=CopyStr(Session->Shell,Settings.RealUser);
+	Session->Shell=CopyStr(Session->Shell,Settings.RealUser);
 }
 
 
@@ -365,7 +371,10 @@ ListAddItem(Streams,Local);
 Tempstr=SetStrLen(Tempstr,4096);
 while (1)
 {
-  S=STREAMSelect(Streams,NULL);
+	if (Settings.IdleTimeout) tv.tv_sec=Settings.IdleTimeout;
+	else tv.tv_sec=3600 * 24;
+  S=STREAMSelect(Streams,&tv);
+	time(&Now);
   if (S)
   {
     if (S==Session->S)
@@ -383,7 +392,11 @@ while (1)
     if (result < 0) break;
 		}
 		if (Settings.Flags & FLAG_WINSIZE) SetWindowSize(Session->S->out_fd);
+		LastActivity=Now;
   }
+
+	
+	if ((Settings.IdleTimeout > 0) && ((Now - LastActivity) > Settings.IdleTimeout)) break;
 }
 
 if (StrLen(Settings.LogoutScript)) system(Settings.LogoutScript);
@@ -419,7 +432,7 @@ if (S)
 		//Flags
 		ptr=GetToken(ptr,"\\S",&Token,0);
 
-		//Mack
+		//MAC
 		ptr=GetToken(ptr,"\\S",&Session->ClientMAC,0);
 			
 		}
@@ -496,6 +509,30 @@ return(RetVal);
 }
 
 
+uid_t JailAndSwitchUser(int Flags, char *User, char *JailDir)
+{
+struct passwd *pwent=NULL;
+uid_t UID=0;
+
+if (! StrLen(User)) pwent=getpwnam("nobody");
+else pwent=getpwnam(User);
+
+chdir(JailDir);
+
+if (Flags & FLAG_CHROOT) chroot(".");
+
+if (pwent) 
+{
+	UID=pwent->pw_uid;
+	if (setreuid(UID,UID) !=0) exit(20);
+}
+else exit(20);
+
+return(UID);
+}
+
+
+
 void HandleClient()
 {
 TSession *Session;
@@ -510,7 +547,8 @@ int i;
 	GetClientHardwareAddress(Session);
 	Session->ClientHost=CopyStr(Session->ClientHost,IPStrToHostName(Session->ClientIP));
 
-	syslog(Settings.InfoLogLevel,"connection from: %s (%s / %s)", Session->ClientHost, Session->ClientIP, Session->ClientMAC);
+	if (StrLen(Session->ClientMAC)) syslog(Settings.InfoLogLevel,"connection from: %s (%s / %s)", Session->ClientHost, Session->ClientIP, Session->ClientMAC);
+	else syslog(Settings.InfoLogLevel,"connection from: %s (%s)", Session->ClientHost, Session->ClientIP);
 
 	if (! CheckClientPermissions(Session)) Session->Flags |= FLAG_DENYAUTH;
 
@@ -537,7 +575,8 @@ int i;
 		{
 			if (Login(Session)) break;
 			printf("\r\nLogin incorrect\r\n"); fflush(NULL);
-			syslog(Settings.ErrorLogLevel,"%s@%s login failed: tries used %d/%d",Session->User,Session->ClientIP,i,Settings.AuthTries);
+
+			if (! (Settings.Flags & FLAG_DENYAUTH))  syslog(Settings.ErrorLogLevel,"%s@%s login failed: tries used %d/%d",Session->User,Session->ClientIP,i,Settings.AuthTries);
 			sleep(Settings.AuthDelay);
 		}
 	}
@@ -561,7 +600,8 @@ char *Tempstr=NULL;
 
 
 Tempstr=SessionSubstituteVars(Tempstr,Settings.PidFile,NULL);
-WritePidFile(Tempstr);
+
+PidFile=WritePidFile(Tempstr);
 DestroyString(Tempstr);
 }
 
@@ -569,9 +609,9 @@ static void default_signal_handler(int sig) { /* do nothing */  }
 
 void PTelnetDServerMode()
 {
-int listensock, fd, val;
-struct sockaddr_in sa;
+int listensock, fd, i;
 struct sigaction sigact;
+char *Tempstr=NULL, *IPStr=NULL;
 
 listensock=InitServerSock(Settings.Interface,Settings.Port);
 if (listensock==-1)
@@ -584,6 +624,8 @@ if (! (Settings.Flags & FLAG_NODEMON)) demonize();
 
 SetupPidFile();
 
+if (Settings.Flags & FLAG_HONEYPOT) JailAndSwitchUser(FLAG_CHROOT, Settings.RealUser, Settings.ChDir);
+
 while (1)
 {
 /*Set up a signal handler for SIGCHLD so that our 'select' gets interrupted when something exits*/
@@ -594,10 +636,13 @@ sigaction(SIGCHLD, &sigact, NULL);
 
 if (FDSelect(listensock, SELECT_READ, NULL)) 
 {
-	val=sizeof(struct sockaddr_in);
-	fd=accept(listensock, (struct sockaddr_in *) &sa, &val);
+	fd=TCPServerSockAccept(listensock, &IPStr);
 	if (fork()==0) 
 	{
+		//Sub processes shouldn't keep the pid file open, only the parent server
+		//should
+		close(PidFile);
+
 		//if we've been passed a socket, then make it into stdin/stdout/stderr
 		//but don't do this is fd==0, because then this has already been done by inetd
 		close(0);
@@ -606,7 +651,20 @@ if (FDSelect(listensock, SELECT_READ, NULL))
 		dup(fd);
 		dup(fd);
 		dup(fd);
+
+		//Having dupped it we no longer need to keep this copy open
+		close(fd);
+		Tempstr=MCopyStr(Tempstr, g_argv[0]," ",IPStr,NULL);
+		for (i=0; i <g_argc; i++) memset(g_argv[i],0,StrLen(g_argv[i]));
+		strcpy(g_argv[0],Tempstr);
+
+		//In case logging demon was restarted, ensure we have connection before we chroot
+		openlog("ptelnetd",LOG_PID|LOG_NDELAY,LOG_DAEMON);
 		HandleClient();
+
+		//Should be redundant, but if something goes wrong in HandleClient, we might want this
+		//exit call
+		_exit(0);
 	}
 	close(fd);
 }
@@ -618,13 +676,14 @@ waitpid(-1,NULL,WNOHANG);
 
 main(int argc, char *argv[])
 {
+g_argc=argc;
+g_argv=argv;
 
 //LOG_NDELAY to open connection immediately. That way we inherit the connection
 //when we chroot
 openlog("ptelnetd",LOG_PID|LOG_NDELAY,LOG_DAEMON);
 
 SettingsInit();
-Settings.Flags |= FLAG_DEBUG;
 SettingsParseCommandLine(argc, argv);
 
 //Check if settings are valid. Abort if the user has asked for something stupid and/or dangerous.
@@ -633,6 +692,7 @@ if (! SettingsValid()) exit(2);
 
 if (Settings.Flags & FLAG_INETD)
 {
+	if (Settings.Flags & FLAG_HONEYPOT) JailAndSwitchUser(FLAG_CHROOT, Settings.RealUser, Settings.ChDir);
 	HandleClient();
 }
 else PTelnetDServerMode();

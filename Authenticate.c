@@ -145,7 +145,7 @@ if (
 
   Digest=CopyStr(Digest, crypt(Session->Password,Salt));
 
-  if (strcmp(Digest,eptr)==0) 
+  if (strcmp(Digest,sptr)==0) 
 	{
 		result=TRUE;
 	}

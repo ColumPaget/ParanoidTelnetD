@@ -675,6 +675,7 @@ ac_subst_files=''
 ac_user_opts='
 enable_option_checking
 enable_largefiles
+enable_ip6
 enable_ssl
 enable_z
 enable_oss
@@ -1296,6 +1297,7 @@ Optional Features:
   --disable-FEATURE       do not include FEATURE (same as --enable-FEATURE=no)
   --enable-FEATURE[=ARG]  include FEATURE [ARG=yes]
   --enable-largefiles       enable largefile support
+  --enable-ip6       enable IPv6 support
   --enable-ssl       use Secure Sockets Layer
   --enable-zlib       use ZLib Compression
   --enable-oss       use Open Sound System
@@ -3321,6 +3323,19 @@ $as_echo "#define _LARGEFILE64_SOURCE 1" >>confdefs.h
 $as_echo "#define _FILE_OFFSET_BITS 64" >>confdefs.h
 
 fi
+
+# Check whether --enable-ip6 was given.
+if test "${enable_ip6+set}" = set; then :
+  enableval=$enable_ip6; cf_use_ip6=$enableval
+fi
+
+
+if test "$cf_use_ip6" = "yes"
+then
+$as_echo "#define USE_INET6 1" >>confdefs.h
+
+fi
+
 
 # Check whether --enable-ssl was given.
 if test "${enable_ssl+set}" = set; then :

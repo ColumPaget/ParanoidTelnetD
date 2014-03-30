@@ -121,7 +121,7 @@ void STREAMResizeBuffer(STREAM *, int);
 int STREAMReadChar(STREAM *);
 int STREAMWriteChar(STREAM *,unsigned char);
 char* STREAMReadLine(char *Buffer, STREAM *);
-int STREAMReadBytesToTerm(STREAM *S, char *Buffer, int BuffSize,unsigned char Term);
+int ReadBytesToTerm(STREAM *S, char *Buffer, int BuffSize,unsigned char Term);
 char* STREAMReadToTerminator(char *Buffer, STREAM *,unsigned char Term);
 char* STREAMReadToMultiTerminator(char *Buffer, STREAM *, char *Terms);
 int STREAMWriteString(const char *Buffer, STREAM *);

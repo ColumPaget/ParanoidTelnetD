@@ -31,7 +31,9 @@
 #define FLAG_WINSIZE 512
 #define FLAG_FORCE_REALUSER 1024
 #define FLAG_FORCE_SHELL 2048
+#define FLAG_HONEYPOT 4096
 #define FLAG_ERROR 134217728
+
 
 typedef struct
 {
@@ -82,6 +84,7 @@ int AuthTries;
 int AuthDelay;
 int ErrorLogLevel;
 int InfoLogLevel;
+int IdleTimeout;
 } TSettings;
 
 
