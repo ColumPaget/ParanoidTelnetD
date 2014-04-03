@@ -46,12 +46,12 @@ SetVar(Vars,"DateTime",GetDateStr("%Y/%m/%d %H:%M:%S",NULL));
 //that we can substitute are 'interface' and 'serverhost/port' etc
 if (Session)
 {
-SetVar(Vars,"ClientHost",Session->ClientHost);
-SetVar(Vars,"ClientIP",Session->ClientIP);
-SetVar(Vars,"ClientMAC",Session->ClientMAC);
-SetVar(Vars,"ServerIP",Session->ServerIP);
-SetVar(Vars,"User",Session->User);
-SetVar(Vars,"RealUser",Session->RealUser);
+	SetVar(Vars,"ClientHost",Session->ClientHost);
+	SetVar(Vars,"ClientIP",Session->ClientIP);
+	SetVar(Vars,"ClientMAC",Session->ClientMAC);
+	SetVar(Vars,"ServerIP",Session->ServerIP);
+	SetVar(Vars,"User",Session->User);
+	SetVar(Vars,"RealUser",Session->RealUser);
 }
 
 Tempstr=SubstituteVarsInString(Tempstr,Format,Vars,0);
@@ -73,12 +73,20 @@ Session->Password=CopyStr(Session->Password,NULL);
 
 //Clear out any crap
 Tempstr=SetStrLen(Tempstr,4096);
-result=TelnetReadBytes(Session->S, Tempstr, 4096, FLAG_ECHO | FLAG_NOPTY | FLAG_NONBLOCK);
+result=TelnetReadBytes(Session->S, Tempstr, 4096, TNRB_ECHO | TNRB_NOPTY | TNRB_NONBLOCK);
 
 while (StrLen(Session->User)==0)
 {
+	if (Settings.Flags & FLAG_CHALLENGE)
+	{
+		Session->Challenge=GenerateSalt(Session->Challenge, 24);
+		Tempstr=MCopyStr(Tempstr, "Challenge/Response String: ", Session->Challenge, "\r\n", NULL); 
+		STREAMWriteLine(Tempstr, Session->S); 
+	}
+
+
 	STREAMWriteLine("login: ", Session->S); STREAMFlush(Session->S);
-	result=TelnetReadBytes(Session->S, Tempstr, 4096, FLAG_ECHO | FLAG_NOPTY);
+	result=TelnetReadBytes(Session->S, Tempstr, 4096, TNRB_ECHO | TNRB_NOPTY);
 	if (result > 0)
 	{
 		Session->User=CopyStrLen(Session->User, Tempstr, result);
@@ -87,12 +95,14 @@ while (StrLen(Session->User)==0)
 }
 
 STREAMWriteLine("Password: ", Session->S); STREAMFlush(Session->S);
-result=TelnetReadBytes(Session->S, Tempstr, 4096, FLAG_NOPTY);
+result=TelnetReadBytes(Session->S, Tempstr, 4096, TNRB_NOPTY);
 if (result > 0)
 {
 	Session->Password=CopyStrLen(Session->Password, Tempstr, result);
 	StripTrailingWhitespace(Session->Password);
 }
+
+STREAMWriteLine("\r\n",Session->S);
 
 if ((Settings.Flags & FLAG_LOCALONLY) && (! StrLen(Session->ClientMAC)))
 {
@@ -101,7 +111,7 @@ if ((Settings.Flags & FLAG_LOCALONLY) && (! StrLen(Session->ClientMAC)))
 else if (Settings.Flags & FLAG_HONEYPOT) syslog(Settings.ErrorLogLevel,"%s@%s login denied (honeypot mode): user=%s pass=%s",Session->User,Session->ClientIP,Session->User,Session->Password);
 else if (
 					(! (Session->Flags & FLAG_DENYAUTH)) &&
-					(Authenticate(Session, AUTH_ANY))
+					(Authenticate(Session))
 )  RetVal=TRUE; 
 
 //Now that we've used the password, blank it from memory!
@@ -273,10 +283,17 @@ if (Settings.Flags & FLAG_CHHOME)
 	setenv("HOME",".",TRUE);
 }
 
+
+//switch group first, as we need to be root to do that
+if (Session->GroupID) 
+{
+	if (setgid(Session->GroupID) !=0) exit(1);
+}
+
 //now switch user
 if (Session->RealUserUID > 0)
 {
-if (setreuid(Session->RealUserUID,Session->RealUserUID) !=0) exit(1);
+if (setresuid(Session->RealUserUID,Session->RealUserUID,Session->RealUserUID) !=0) exit(1);
 }
 
 return(execl(Settings.Shell,Settings.Shell,NULL));
@@ -296,6 +313,7 @@ char *Tempstr=NULL;
 int result, fd;
 ListNode *Streams;
 struct passwd *pwent;
+struct group *grent;
 struct timeval tv;
 time_t Duration, Start, Now, LastActivity;
 
@@ -308,16 +326,22 @@ ListAddItem(Streams,Session->S);
 //anything read from password files
 if (Settings.Flags & FLAG_FORCE_REALUSER)
 {
-Session->RealUser=CopyStr(Session->RealUser,Settings.RealUser);
+	Session->RealUser=CopyStr(Session->RealUser,Settings.RealUser);
 }
 
 //Get User Details before we chroot! 
 if (StrLen(Session->RealUser))
 {
     pwent=getpwnam(Session->RealUser);
-		if (! pwent) exit(1);
+		if (! pwent)
+		{
+			syslog(Settings.InfoLogLevel,"Failed to lookup RealUser '%s' for user '%s'",Session->RealUser,Session->User);
+			exit(1);
+		}
 		Session->RealUserUID=pwent->pw_uid;
+		Session->GroupID=pwent->pw_gid;
 }
+
 
 //if '-shell' was specified on the command-line, then this overrides
 //anything read from password files
@@ -379,7 +403,7 @@ while (1)
   {
     if (S==Session->S)
 		{
-			result=TelnetReadBytes(Session->S, Tempstr, 4096, FLAG_NONBLOCK);
+			result=TelnetReadBytes(Session->S, Tempstr, 4096, TNRB_NONBLOCK);
 			if (result ==-1) break;
 			STREAMWriteBytes(Local,Tempstr,result);
 		}
@@ -524,7 +548,8 @@ if (Flags & FLAG_CHROOT) chroot(".");
 if (pwent) 
 {
 	UID=pwent->pw_uid;
-	if (setreuid(UID,UID) !=0) exit(20);
+	if (setgid(pwent->pw_gid) !=0) exit(20);
+	if (setresuid(UID,UID,UID) !=0) exit(20);
 }
 else exit(20);
 
@@ -672,6 +697,7 @@ waitpid(-1,NULL,WNOHANG);
 }
 
 }
+
 
 
 main(int argc, char *argv[])

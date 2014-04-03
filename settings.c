@@ -69,19 +69,24 @@ printf("%-33s %s","-logout-script <path>","Script to run to clean up user's envi
 printf("%-33s %s","-m <dir list>","list of directories to 'bind mount' in user's home dir. See 'BIND MOUNTS' below\n");
 printf("%-33s %s","-mounts <dir list>","list of directories to 'bind mount' in user's home dir. See 'BIND MOUNTS' below\n");
 printf("%-33s %s","-honeypot","'Honeypot' mode. Fail to authenticate any user, even if they've got the right password, and log EVERYTHING as critical. See 'HONEYPOT MODE' below.\n");
-printf("%-33s %s","-user add [-a <auth file> <username> <password> [-encrypt <encryption type>] [-home <home directory>] [-shell <shell>]","'Add a user to the config file. -encrypt sets the type of encryption used to protect the stored password. Default is 'sha1', other options are 'md5', 'sha256' and 'sha512'.\n");
+printf("%-33s %s","-user add [-a <auth file> <username> <password> [-encrypt <encryption type>] [-home <home directory>] [-shell <shell>]","'Add a user to the config file. -encrypt sets the type of encryption used to protect the stored password. Default is 'sha1', other options are 'plain', 'md5', 'sha256' and 'sha512'.\n");
 printf("%-33s %s","-user del [-a <auth file> <username>","'Delete a user from the config file.\n");
 printf("%-33s %s","-user list [-a <auth file>","List users in the config file.\n");
 
 printf("\nAUTHENTICATION.\n\n");
 printf("   ptelnetd can use a number of different authentication methods, which can be set with the '-auth-types' command line option. Available types are:\n\n");
-printf("	native	The default method. Uses ptelnetd's native authentication file (specified with -auth-file, defaults to /etc/ptelnetd.auth) to authenticate.\n Available methods are:\n\n");
-printf("	pam		Use Pluggable Authentication Modules.\n");
-printf("	shadow	Authenticate against passwords in /etc/shadow.\n");
-printf("	passwd	Authenticate against passwords in /etc/passwd.\n");
-printf("	open	NO AUTHENTICATION. This method has certain restrictions.\n\n");
-printf("    'open' authentication can only be used in combination with either -chroot or -chhome. Without some form of chroot jail, 'open' authentication would allow anyone to get a shell on your system without logging in, which would be a Bad Thing.\n\n");
-printf("    'native' authentication is set up using the 'ptelnetd -user add/delete/list' commands. The default authentication file is /etc/ptelnetd, but this can be overridden with the '-auth-file' option.\n");
+printf("  %- 10s %s\n","native","The default method. Uses ptelnetd's native authentication file (specified with -auth-file, defaults to /etc/ptelnetd.auth) to authenticate.");
+printf("  %- 10s %s\n", "pam","Use Pluggable Authentication Modules.");
+printf("  %- 10s %s\n", "shadow","Authenticate against passwords in /etc/shadow.");
+printf("  %- 10s %s\n", "passwd","Authenticate against passwords in /etc/passwd.");
+printf("  %- 10s %s\n", "cr-md5","Challenge/Response using native file passwords and md5 hashing.");
+printf("  %- 10s %s\n", "cr-sha1","Challenge/Response using native file passwords and sha1 hashing.");
+printf("  %- 10s %s\n", "cr-sha256","Challenge/Response using native file passwords and sha256 hashing.");
+printf("  %- 10s %s\n", "cr-sha512","Challenge/Response using native file passwords and sha512 hashing.");
+printf("  %- 10s %s\n", "open","NO AUTHENTICATION. This method has certain restrictions.");
+printf("\n    'open' authentication can only be used in combination with either -chroot or -chhome. Without some form of chroot jail, 'open' authentication would allow anyone to get a shell on your system without logging in, which would be a Bad Thing.\n\n");
+printf("    'native' authentication is set up using the 'ptelnetd -user add/delete/list' commands. The default authentication file is /etc/ptelnetd, but this can be overridden with the '-auth-file' option.\n\n");
+printf("    'cr-md5', 'cr-sha1', 'cr-sha256', 'cr-sha512'. These are challenge-response authentication types. They require a password stored in PLAINTEXT in the native authentication file. When any of these authentication types are active the ptelnetd server sends a 'Challenge' string on the line before the 'login' prompt. The user authenticates by concatanating their password to the Challenge string (seperated by a colon) and then hashing the entire resulting string with the specified hash function. They submit this hashed string at the hash prompt. These hash strings can be created using utilites like 'md5sum' or 'sha512sum' by doing: 'echo -n 4+SiluCNxtX/CfM1jGnnK2JiunOnwnlz:MyPassword | md5sum' Where the long string before the colon is the Challenge obtained from the server, and 'MyPassword' is the users password.\n\n");
 printf("    Most authentication methods can be used in combination by listing them as comma-separated values. The only exception is 'open', which must be specified on its own, or it will be ignored\n");
 
 printf("\nUSERS and REAL USERS\n\n");
@@ -357,6 +362,8 @@ if (Settings.Flags & FLAG_ERROR)
 
 int SettingsValid()
 {
+char *Token=NULL, *ptr;
+
 if (! StrLen(Settings.RealUser))
 {
   printf("%s\n","ERROR: ParanoidTelnetD cannot find a user to run programs as. ParanoidTelnetD is too paranoid to run programs as root.");
@@ -364,16 +371,29 @@ if (! StrLen(Settings.RealUser))
   return(FALSE);
 }
 
-if (strcmp(Settings.AuthMethods,"open")==0)
+ptr=GetToken(Settings.AuthMethods,",",&Token,0);
+while (ptr)
 {
-	if (! (Settings.Flags & (FLAG_CHROOT | FLAG_CHHOME)))
+	if (strcmp(Token,"open")==0)
 	{
+		if (! (Settings.Flags & (FLAG_CHROOT | FLAG_CHHOME)))
+		{
 		printf("%s\n","ERROR: ParanoidTelnetD is too paranoid to allow 'open' authentication type without 'chroot' or 'chhome'. This would give free access to your entire system without a password. ParanoidTelnetd thinks that you are a little naieve.");
 		syslog(LOG_ERR,"%s\n","ERROR: ParanoidTelnetD is too paranoid to allow 'open' authentication type without 'chroot' or 'chhome'. This would give free access to your entire system without a password. ParanoidTelnetd thinks that you are a little naieve.");
-	 return(FALSE);
+
+		DestroyString(Token);
+		return(FALSE);
+		}
 	}
+	else if (strncmp(Token,"cr-",3)==0)
+	{
+		Settings.Flags |= FLAG_CHALLENGE;
+	}
+
+ptr=GetToken(ptr,",",&Token,0);
 }
 
+DestroyString(Token);
 return(TRUE);
 }
 

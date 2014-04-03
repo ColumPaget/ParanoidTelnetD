@@ -17,30 +17,6 @@
 
 char *AuthenticationsTried=NULL;
 
-int CheckUserExists(char *UserName)
-{
-TSession *Session;
-int result=FALSE;
-
-if (! UserName) return(FALSE);
-
-Session=(TSession *) calloc(1,sizeof(TSession));
-Session->User=CopyStr(Session->User,UserName);
-Session->Password=CopyStr(Session->Password,"");
-
-if (AuthPasswordFile(Session) != USER_UNKNOWN) result=TRUE;
-if (AuthShadowFile(Session) != USER_UNKNOWN) result=TRUE;
-if (AuthNativeFile(Session) != USER_UNKNOWN) result=TRUE;
-
-DestroyString(Session->User);
-DestroyString(Session->Password);
-
-free(Session);
-
-return(result);
-}
-
-
 
 int CheckServerAllowDenyLists(char *UserName)
 {
@@ -270,22 +246,25 @@ return(Possibilities[i]);
 
 
 
-int NativeFileCheckPassword(char *Name, char *PassType,char *Salt,char *Password,char *ProvidedPass)
+int NativeFileCheckPassword(char *Name, char *PassType, char *Salt, char *Password, char *ProvidedPass)
 {
-char *Digest=NULL, *Tempstr=NULL;
+char *Digest=NULL, *Tempstr=NULL, *Token=NULL, *ptr;
+int result=FALSE;
 
 if (! PassType) return(FALSE);
 if (! Password) return(FALSE);
 if (! ProvidedPass) return(FALSE);
 
 if (strcmp(PassType,"null")==0) return(TRUE);
-if (
-      (strcmp(PassType,"plain")==0) &&
-      (strcmp(Password,ProvidedPass)==0)
-  )
-return(TRUE);
+if ((strcmp(PassType,"plain")==0) && (strcmp(Password,ProvidedPass)==0)) return(TRUE);
 
-if (StrLen(PassType) && StrLen(ProvidedPass))
+if (strncmp(PassType,"cr-",3)==0)
+{
+      Tempstr=MCopyStr(Tempstr,Salt,":",Password,NULL);
+      HashBytes(&Digest, PassType+3, Tempstr, StrLen(Tempstr), ENCODE_HEX);
+      if (strcasecmp(Digest,ProvidedPass)==0) result=TRUE;
+}
+else  if (StrLen(PassType) && StrLen(ProvidedPass))
 {
   if (StrLen(Salt))
   {
@@ -296,22 +275,20 @@ if (StrLen(PassType) && StrLen(ProvidedPass))
   //Old-style unsalted passwords
   else HashBytes(&Digest,PassType,ProvidedPass,StrLen(ProvidedPass),ENCODE_HEX);
 
-  if (StrLen(Digest) && (strcmp(Password,Digest)==0))
-  {
-    DestroyString(Digest);
-    return(TRUE);
-  }
+  if (StrLen(Digest) && (strcmp(Password,Digest)==0)) result=TRUE;
 }
+
 DestroyString(Tempstr);
 DestroyString(Digest);
+DestroyString(Token);
 
-return(FALSE);
+return(result);
 }
 
 
 
 
-int AuthNativeFile(TSession *Session)
+int AuthNativeFile(TSession *Session, char *AuthType)
 {
 STREAM *S;
 char *Tempstr=NULL,*ptr;
@@ -319,15 +296,12 @@ char *Name=NULL, *Pass=NULL, *RealUser=NULL, *HomeDir=NULL, *PassType=NULL, *Sal
 int RetVal=USER_UNKNOWN;
 struct passwd *pass_struct;
 
-AuthenticationsTried=CatStr(AuthenticationsTried,"native ");
+AuthenticationsTried=MCatStr(AuthenticationsTried,AuthType," ",NULL);
 
 if (StrLen(Settings.AuthFile))
 {
 S=STREAMOpenFile(Settings.AuthFile,O_RDONLY);
-if (! S) 
-{
-return(USER_UNKNOWN);
-}
+if (! S) return(USER_UNKNOWN);
 
 Tempstr=STREAMReadLine(Tempstr,S);
 while (Tempstr)
@@ -335,15 +309,26 @@ while (Tempstr)
   StripTrailingWhitespace(Tempstr);
 	ptr=GetToken(Tempstr,":",&Name,0);
 	ptr=GetToken(ptr,":",&PassType,0);
-	if (strcasecmp(PassType,"plain") !=0) ptr=GetToken(ptr,"$",&Salt,0);
+
+	//plain passwords aren't salted, but can be used with challenge/response, in which case the 'salt' is 
+	//is the challenge string
+	if (strcasecmp(PassType,"plain") ==0) 
+	{
+		Salt=CopyStr(Salt, Session->Challenge);
+		if (strncmp(AuthType,"cr-",3)==0) PassType=CopyStr(PassType, AuthType);
+	}
+	else ptr=GetToken(ptr,"$",&Salt,0);
+
 	ptr=GetToken(ptr,":",&Pass,0);
 	ptr=GetToken(ptr,":",&RealUser,0);
 	ptr=GetToken(ptr,":",&HomeDir,0);
 	ptr=GetToken(ptr,":",&Shell,0);
 	
+
   if (strcasecmp(Name,Session->User)==0)
   {
 		RetVal=FALSE;
+		
     if (NativeFileCheckPassword(Name,PassType,Salt,Pass,Session->Password))
     {
 			RetVal=TRUE;
@@ -427,7 +412,7 @@ else
 {
   //if /dev/random is missing, then this should be 'better than nothing'
   gettimeofday(&tv,NULL);
-  RetStr=FormatStr(RetStr,"%lux-%lux-%lux-%lux",getpid(),tv.tv_usec,tv.tv_sec,clock());
+  RetStr=FormatStr(RetStr,"%lux-%lux-%lux-%lux-%lux",getpid(),tv.tv_usec,tv.tv_sec,clock(),rand());
   fprintf(stderr,"WARNING: Failed to open /dev/random. Using less secure 'generated' salt for password.\n");
 }
 
@@ -490,10 +475,11 @@ if (StrLen(Settings.AuthFile))
     else
     {
       Salt=GenerateSalt(Salt,16);
-      Tempstr=MCopyStr(Tempstr,Name,":",Pass,":",Salt,NULL);
-      HashBytes(&Token, PassType, Tempstr, StrLen(Tempstr), ENCODE_BASE64);
+      Token=MCopyStr(Token,Name,":",Pass,":",Salt,NULL);
+      HashBytes(&Tempstr, PassType, Token, StrLen(Token), ENCODE_BASE64);
+			Token=MCopyStr(Token,Salt,"$",Tempstr,NULL);
     }
-    Tempstr=MCopyStr(Tempstr,Name,":",PassType,":",Salt,"$",Token,":",RealUser,":",HomeDir,":",Shell,":",Args,"\n",NULL);
+    Tempstr=MCopyStr(Tempstr,Name,":",PassType,":",Token,":",RealUser,":",HomeDir,":",Shell,":",Args,"\n",NULL);
 
 		STREAMWriteLine(Tempstr,S);
 
@@ -514,8 +500,35 @@ ListDestroy(Entries,DestroyString);
 
 return(RetVal);
 }
+
+
+int CheckUserExists(char *UserName)
+{
+TSession *Session;
+int result=FALSE;
+
+if (! UserName) return(FALSE);
+
+Session=(TSession *) calloc(1,sizeof(TSession));
+Session->User=CopyStr(Session->User,UserName);
+Session->Password=CopyStr(Session->Password,"");
+
+if (AuthPasswordFile(Session) != USER_UNKNOWN) result=TRUE;
+if (AuthShadowFile(Session) != USER_UNKNOWN) result=TRUE;
+if (AuthNativeFile(Session, "") != USER_UNKNOWN) result=TRUE;
+
+DestroyString(Session->User);
+DestroyString(Session->Password);
+
+free(Session);
+
+return(result);
+}
+
+
+
 	
-int Authenticate(TSession *Session, int AuthType)
+int Authenticate(TSession *Session)
 {
 int result=0;
 char *Token=NULL, *ptr;
@@ -537,7 +550,8 @@ while (ptr)
 {
 	StripLeadingWhitespace(Token);
 	StripTrailingWhitespace(Token);
-	if (strcasecmp(Token,"native")==0) result=AuthNativeFile(Session);
+	if (strcasecmp(Token,"native")==0) result=AuthNativeFile(Session, Token);
+	else if (strncasecmp(Token,"cr-",3)==0) result=AuthNativeFile(Session, Token);
 	else if (strcasecmp(Token,"shadow")==0) result=AuthShadowFile(Session);
 	else if (strcasecmp(Token,"passwd")==0) result=AuthPasswordFile(Session);
 	#ifdef HAVE_LIBPAM

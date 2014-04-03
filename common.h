@@ -12,9 +12,6 @@
 
 //Session and Protocol flags
 #define FLAG_AUTHENTICATED 1
-#define FLAG_NOPTY 2
-#define FLAG_NONBLOCK 4
-#define FLAG_ECHO 8
 #define FLAG_UNMOUNT 16
 #define FLAG_DENYAUTH 32
 
@@ -32,8 +29,8 @@
 #define FLAG_FORCE_REALUSER 1024
 #define FLAG_FORCE_SHELL 2048
 #define FLAG_HONEYPOT 4096
+#define FLAG_CHALLENGE 8192
 #define FLAG_ERROR 134217728
-
 
 typedef struct
 {
@@ -50,6 +47,7 @@ char *ClientMAC;
 char *ServerIP;
 char *Shell;
 time_t LastActivity;
+char *Challenge;
 STREAM *S;
 } TSession;
 
@@ -85,6 +83,7 @@ int AuthDelay;
 int ErrorLogLevel;
 int InfoLogLevel;
 int IdleTimeout;
+int ChallengeResponse;
 } TSettings;
 
 
