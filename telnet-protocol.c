@@ -123,8 +123,18 @@ unsigned char *ptr;
 
 int TelnetHandleChar(STREAM *S, char *Data, int len, int inchar, char *EchoStr, int Flags)
 {
+struct timeval tv;
+
 	Data[len]=inchar & 0xFF;
-	if (Flags & FLAG_ECHO) 
+
+	if (Flags & TNRB_DISCARD_NEXT_CHAR)
+	{
+		tv.tv_sec=0;
+		tv.tv_usec=100000;
+		if (STREAMCheckForBytes(S) || FDSelect(S->in_fd,0,&tv)) STREAMReadChar(S);
+	}
+	
+	if (Flags & TNRB_ECHO) 
 	{
 		if (EchoStr) STREAMWriteBytes(S,EchoStr,strlen(EchoStr));
 		else STREAMWriteBytes(S,&inchar,1);
@@ -144,7 +154,7 @@ int result=0;
 
 while (1)
 {
-if ((Flags & FLAG_NONBLOCK) && (STREAMCheckForBytes(S)==0)) break;
+if ((Flags & TNRB_NONBLOCK) && (STREAMCheckForBytes(S)==0)) break;
 if (len >= max) break;
 
 inchar=STREAMReadChar(S);
@@ -169,13 +179,13 @@ case '\n':
 break;
 
 case '\r':
-	if (Flags & FLAG_NOPTY) return(TelnetHandleChar(S, Data, len, inchar, "\r\n", Flags));
+	if (Flags & TNRB_NOPTY) return(TelnetHandleChar(S, Data, len, inchar, "\r\n", Flags | TNRB_DISCARD_NEXT_CHAR));
 	else len=TelnetHandleChar(S, Data, len, inchar, NULL, Flags);
 break;
 
 case '\b':
 case TELNET_BACKSPACE:
-	if (Flags & FLAG_NOPTY) 
+	if (Flags & TNRB_NOPTY) 
 	{
 			len--;
 			STREAMWriteBytes(S,&inchar,1);

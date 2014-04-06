@@ -4,6 +4,14 @@
 
 #include "common.h"
 
+
+//Flags that control 'TelnetReadBytes'
+#define TNRB_ECHO  1
+#define TNRB_NOPTY 2
+#define TNRB_NONBLOCK 4
+#define TNRB_DISCARD_NEXT_CHAR 8
+
+
 #define TELNET_NEGOTITATE -2
 
 #define TELNET_ECHO 1
@@ -35,6 +43,6 @@
 
 void TelnetSendNegotiation(STREAM *S, int DoWill, int Type);
 void 	TelnetHandleNegotiation(STREAM *S);
-int TelnetReadBytes(STREAM *S, char *Data, int max, int NonBlock);
+int TelnetReadBytes(STREAM *S, char *Data, int max, int Flags);
 
 #endif
