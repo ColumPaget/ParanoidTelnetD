@@ -19,6 +19,7 @@ printf("ParanoidTelnetD: version %s\n",VERSION);
 printf("Author: Colum Paget\n");
 printf("Email: colums.projects@gmail.com\n");
 printf("Blog: http://idratherhack.blogspot.com\n\n");
+printf("Credits: Sebastien Millet for patch to libUseful-2.0/pty.c that fixes segfaults on some systems\n");
 
 printf("ptelnetd (Paranoid Telnet Daemon) is a telnet server intended to be used with embedded or commodity hardware that communicates over telnet. ptelnetd has its own authentication system, so that usernames/passwords can be used that are unique to ptelnetd, and cannot be used to log into the main system. When used with this 'native' authentication ptelnetd cannot log in users against accounts that are not listed in it's authentication file, thus limiting logins to those usernames/passwords set up for use with ptelnetd, and potentially only with ptelentd. Ptelnetd supports two types of chroot jail, blacklisting/whitelisting of users, ip-addresses and mac-addresses, and many other features intended to make the insecure telnet protocol as secure as possible.\n\n");
 printf("Usage: ptelnetd <options>\n");
@@ -162,6 +163,7 @@ Settings.LogPath=CopyStr(Settings.LogPath,"/var/log/telnetd.log");
 Settings.BindMounts=CopyStr(Settings.BindMounts,"");
 Settings.PidFile=CopyStr(Settings.PidFile,"/var/run/ptelnetd-$(Interface)-$(ServerPort).pid");
 Settings.BlockHosts=ListCreate();
+Settings.TermType=CopyStr(Settings.TermType,"vt100");
 for (i=0; DefaultUsers[i] !=NULL; i++)
 {
 			if (getpwnam(DefaultUsers[i]))
