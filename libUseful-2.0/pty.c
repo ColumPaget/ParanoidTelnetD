@@ -198,7 +198,7 @@ if (*pty > -1)
 {
 	grantpt(*pty);
 	unlockpt(*pty);
-	SetStrLen(Tempstr,100);
+	Tempstr=SetStrLen(Tempstr,100);
 	if (ptsname_r(*pty,Tempstr,100)==0)
 	{
 		if ( (*tty=open(Tempstr,O_RDWR)) >-1)
