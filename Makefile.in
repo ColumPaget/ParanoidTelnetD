@@ -12,7 +12,7 @@ EXE=ptelnetd
 
 all: $(OBJ) main.c
 	@cd libUseful-2.0; $(MAKE)
-	gcc -g $(LIBS) -o$(EXE) $(OBJ) main.c libUseful-2.0/libUseful-2.0.a
+	gcc -g -o$(EXE) $(OBJ) main.c libUseful-2.0/libUseful-2.0.a $(LIBS)
 
 
 Authenticate.o: Authenticate.c Authenticate.h

@@ -70,7 +70,7 @@ char *BindMounts;
 char *Banner;
 char *Environment;
 char *DynamicHomeDir;
-char *Shell;
+char *DefaultShell;
 char *TermType;
 char *LoginScript;
 char *LogoutScript;

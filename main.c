@@ -66,6 +66,7 @@ int Login(TSession *Session)
 {
 char *Tempstr=NULL;
 int result, RetVal=FALSE;
+time_t Duration, Start, Now, LastActivity;
 
 
 Session->User=CopyStr(Session->User,NULL);
@@ -77,6 +78,10 @@ result=TelnetReadBytes(Session->S, Tempstr, 4096, TNRB_ECHO | TNRB_NOPTY | TNRB_
 
 while (StrLen(Session->User)==0)
 {
+  time(&LastActivity);
+
+  if (Settings.IdleTimeout > 0) STREAMSetTimeout(Session->S, Settings.IdleTimeout);
+
 	if (Settings.Flags & FLAG_CHALLENGE)
 	{
 		Session->Challenge=GenerateSalt(Session->Challenge, 24);
@@ -93,6 +98,10 @@ while (StrLen(Session->User)==0)
 		StripTrailingWhitespace(Session->User);
 	}
 }
+
+  time(&Now);
+  if ((Settings.IdleTimeout > 0) && ((Now - LastActivity) > Settings.IdleTimeout)) break;
+
 
 STREAMWriteLine("Password: ", Session->S); STREAMFlush(Session->S);
 result=TelnetReadBytes(Session->S, Tempstr, 4096, TNRB_NOPTY);
@@ -296,7 +305,7 @@ if (Session->RealUserUID > 0)
 if (setresuid(Session->RealUserUID,Session->RealUserUID,Session->RealUserUID) !=0) exit(1);
 }
 
-return(execl(Settings.Shell,Settings.Shell,NULL));
+return(execl(Session->Shell,Session->Shell,NULL));
 }
 
 
@@ -373,6 +382,8 @@ if (StrLen(Settings.LoginScript)) system(Settings.LoginScript);
 
 //LAUNCH THE SHELL FUNCTION!!! This launches the program that the telnet user is 'speaking' to.
 //If chhome is active, then it will be chrooted into the user's home directory
+
+
 PseudoTTYSpawnFunction(&fd, LaunchPtyFunc, Session,  TTYFLAG_CANON | TTYFLAG_ECHO | TTYFLAG_CRLF | TTYFLAG_LFCR | TTYFLAG_IGNSIG);
 Local=STREAMFromFD(fd);
 STREAMSetTimeout(Local,0);
@@ -566,6 +577,7 @@ int i;
 
 
 	Session=(TSession *) calloc(1,sizeof(TSession));
+	Session->Shell=CopyStr(Session->Shell,Settings.DefaultShell);
 	Session->S=STREAMFromDualFD(0,1);
 	STREAMSetTimeout(Session->S,0);
 	GetSockDetails(0, &Session->ServerIP, &i, &Session->ClientIP, &i);

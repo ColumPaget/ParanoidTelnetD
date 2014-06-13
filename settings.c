@@ -157,7 +157,7 @@ Settings.AuthTries=3;
 Settings.IdleTimeout=3600;
 Settings.AuthMethods=CopyStr(Settings.AuthMethods,"native");
 Settings.AuthFile=CopyStr(Settings.AuthFile,"/etc/ptelnetd.auth");
-Settings.Shell=CopyStr(Settings.Shell,"/bin/sh");
+Settings.DefaultShell=CopyStr(Settings.DefaultShell,"/bin/sh");
 Settings.LogPath=CopyStr(Settings.LogPath,"/var/log/telnetd.log");
 Settings.BindMounts=CopyStr(Settings.BindMounts,"");
 Settings.PidFile=CopyStr(Settings.PidFile,"/var/run/ptelnetd-$(Interface)-$(ServerPort).pid");
@@ -323,12 +323,12 @@ for (i=1; i < argc; i++)
 	else if (strcmp("-idle", argv[i])==0) Settings.IdleTimeout=atoi(argv[++i]);
 	else if (strcmp("-shell", argv[i])==0)
 	{
-		Settings.Shell=CopyStr(Settings.Shell,argv[++i]);
+		Settings.DefaultShell=CopyStr(Settings.DefaultShell,argv[++i]);
 		Settings.Flags |= FLAG_FORCE_SHELL;
 	}
 	else if (strcmp("-error-log-level", argv[i])==0) Settings.ErrorLogLevel=SettingsParseLogLevel(argv[++i]);
 	else if (strcmp("-info-log-level", argv[i])==0) Settings.InfoLogLevel=SettingsParseLogLevel(argv[++i]);
-	else if (strcmp("-shell", argv[i])==0) Settings.Shell=CopyStr(Settings.Shell,argv[++i]);
+	else if (strcmp("-shell", argv[i])==0) Settings.DefaultShell=CopyStr(Settings.DefaultShell,argv[++i]);
 	else if (strcmp("-login-script", argv[i])==0) Settings.LoginScript=CopyStr(Settings.LoginScript,argv[++i]);
 	else if (strcmp("-logout-script", argv[i])==0) Settings.LogoutScript=CopyStr(Settings.LogoutScript,argv[++i]);
 	else if (strcmp("-real-user", argv[i])==0) 
