@@ -97,11 +97,11 @@ while (StrLen(Session->User)==0)
 		Session->User=CopyStrLen(Session->User, Tempstr, result);
 		StripTrailingWhitespace(Session->User);
 	}
-}
 
   time(&Now);
   if ((Settings.IdleTimeout > 0) && ((Now - LastActivity) > Settings.IdleTimeout)) break;
 
+}
 
 STREAMWriteLine("Password: ", Session->S); STREAMFlush(Session->S);
 result=TelnetReadBytes(Session->S, Tempstr, 4096, TNRB_NOPTY);
