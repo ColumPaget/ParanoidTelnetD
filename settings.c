@@ -9,7 +9,6 @@
 void PrintVersion()
 {
 fprintf(stdout,"ParanoidTelnetD: version %s\n",VERSION);
-fprintf(stdout,"version: %s\n",Version);
 fprintf(stdout,"\nBuilt: %s %s\n",__DATE__,__TIME__);
 fprintf(stdout,"libUseful: Version %s BuildTime: %s\n",LibUsefulGetValue("LibUsefulVersion"), LibUsefulGetValue("LibUsefulBuildTime"));
 /*
