@@ -189,6 +189,8 @@ while (ptr)
 }
 
 DestroyString(Token);
+DestroyString(Tempstr);
+DestroyString(UmountList);
 }
 
 
@@ -441,7 +443,6 @@ if (Settings.Flags & FLAG_DYNHOME) rmdir(Session->HomeDir);
 Duration=time(NULL) - Start;
 syslog(Settings.InfoLogLevel,"%s@%s logged out after %d secs",Session->User,Session->ClientIP, Duration);
 
-STREAMClose(Session->S);
 STREAMClose(Local);
 DestroyString(Tempstr);
 }
@@ -626,8 +627,12 @@ int i;
 	}
 	else syslog(Settings.ErrorLogLevel,"login from %s failed after %d tries",Session->ClientIP,i);
 
+	SessionClose(Session);
+	STREAMClose(Session->S);
+
 	DestroyString(Tempstr);
 	free(Session);
+	
 	_exit(0);
 }
 

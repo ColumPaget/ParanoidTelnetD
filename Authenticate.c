@@ -11,12 +11,13 @@
 
 #ifdef HAVE_LIBPAM
 #include <security/pam_appl.h>
+
+pam_handle_t *pamh=NULL;
 #endif
 
 #define USER_UNKNOWN -1
 
 char *AuthenticationsTried=NULL;
-
 
 int CheckServerAllowDenyLists(char *UserName)
 {
@@ -160,7 +161,7 @@ int PAMConvFunc(int NoOfMessages, const struct pam_message **messages,
          struct pam_response **responses, void *appdata)
 {
 int count;
-struct pam_message *mess;
+const struct pam_message *mess;
 struct pam_response *resp;
 
 *responses=(struct pam_response *) calloc(NoOfMessages,sizeof(struct pam_response));
@@ -184,36 +185,48 @@ return(PAM_SUCCESS);
 }
 
 
+
+int PAMStart(TSession *Session, const char *User)
+{
+static struct pam_conv  PAMConvStruct = {PAMConvFunc, NULL };
+const char *PAMConfigs[]={"ptelnetd","telnet","other",NULL};
+int result=PAM_PERM_DENIED, i;
+
+  PAMConvStruct.appdata_ptr=(void *)Session->Password;
+
+  for (i=0; (PAMConfigs[i] != NULL) && (result != PAM_SUCCESS); i++)
+  {
+    result=pam_start(PAMConfigs[i],User,&PAMConvStruct,&pamh);
+  }
+
+  if (result==PAM_SUCCESS)
+  {
+  pam_set_item(pamh,PAM_RUSER,Session->User);
+  if (StrLen(Session->ClientHost) > 0) pam_set_item(pamh,PAM_RHOST,Session->ClientHost);
+  else if (StrLen(Session->ClientIP) > 0) pam_set_item(pamh,PAM_RHOST,Session->ClientIP);
+  else pam_set_item(pamh,PAM_RHOST,"");
+  return(TRUE);
+  }
+
+  return(FALSE);
+}
+
+
+
 int AuthPAM(TSession *Session)
 {
-static pam_handle_t *pamh;
 static struct pam_conv  PAMConvStruct = {PAMConvFunc, NULL };
 int result;
 
 AuthenticationsTried=CatStr(AuthenticationsTried,"pam ");
-PAMConvStruct.appdata_ptr=(void *)Session->Password;
 
-
-if(
-		(pam_start("telnet",Session->User,&PAMConvStruct,&pamh) !=PAM_SUCCESS) &&
-		(pam_start("other",Session->User,&PAMConvStruct,&pamh) !=PAM_SUCCESS)
-	)
-	{
-  	return(USER_UNKNOWN);
-	}
-
-/* set the credentials for the remote user and remote host */
-pam_set_item(pamh,PAM_RUSER,Session->User);
-if (StrLen(Session->ClientHost) > 0) pam_set_item(pamh,PAM_RHOST,Session->ClientHost);
-else if (StrLen(Session->ClientIP) > 0) pam_set_item(pamh,PAM_RHOST,Session->ClientIP);
-else pam_set_item(pamh,PAM_RHOST,"");
-
+if(! PAMStart(Session, Session->User))
+  {
+    LogToFile(Settings.LogPath,"PAM: No such user %s",Session->User);
+    return(USER_UNKNOWN);
+}
 
 result=pam_authenticate(pamh,0);
-
-pam_end(pamh,PAM_SUCCESS);
-
-
 
 if (result==PAM_SUCCESS)
 {
@@ -221,6 +234,34 @@ if (result==PAM_SUCCESS)
 	return(TRUE);
 }
 else return(FALSE);
+}
+
+
+
+int AuthPAMCheckSession(TSession *Session)
+{
+if (! pamh)
+{
+  if (! PAMStart(Session, Session->RealUser)) return(FALSE);
+}
+
+if (pam_acct_mgmt(pamh, 0)==PAM_SUCCESS)
+{
+  pam_open_session(pamh, 0);
+  return(TRUE);
+}
+return(FALSE);
+}
+
+
+
+void AuthPAMClose()
+{
+  if (pamh)
+  {
+  pam_close_session(pamh, 0);
+  pam_end(pamh,PAM_SUCCESS);
+  }
 }
 #endif
 
@@ -542,8 +583,15 @@ if (! CheckUserExists(Session->User))
 
 AuthenticationsTried=CopyStr(AuthenticationsTried,"");
 
-
 if (! CheckServerAllowDenyLists(Session->User)) return(FALSE);
+
+//check for this as it changes behavior of other auth types
+ptr=GetToken(Settings.AuthMethods,",",&Token,0);
+while (ptr)
+{
+  if (strcasecmp(Token,"session-pam")==0) Session->Flags |= FLAG_SESSION_PAM;
+  ptr=GetToken(ptr,",",&Token,0);
+}
 
 ptr=GetToken(Settings.AuthMethods,",",&Token,0);
 while (ptr)
@@ -555,14 +603,14 @@ while (ptr)
 	else if (strcasecmp(Token,"shadow")==0) result=AuthShadowFile(Session);
 	else if (strcasecmp(Token,"passwd")==0) result=AuthPasswordFile(Session);
 	#ifdef HAVE_LIBPAM
-	else if (strcasecmp(Token,"pam")==0) result=AuthPAM(Session);
+	else if (strcasecmp(Token,"pam")==0) 
+	{
+		result=AuthPAM(Session);
+	}
 	#endif
 
-	if (result==TRUE) 
-	{
-		Session->Flags |= FLAG_AUTHENTICATED;
-		break;
-	}
+
+	if (result==TRUE) break;
 	ptr=GetToken(ptr,",",&Token,0);
 }
 
@@ -601,11 +649,30 @@ if (result)
 }
 
 
+//check again, because may have changed in above block
+if (result && (Session->Flags & FLAG_SESSION_PAM))
+{
+#ifdef HAVE_LIBPAM
+  if (! AuthPAMCheckSession(Session))
+  {
+    LogToFile(Settings.LogPath,"PAM Account invalid for '%s'. Login Denied",Session->User);
+    result=FALSE;
+  }
+#endif
+}
+
+if (result==TRUE) Session->Flags |= FLAG_AUTHENTICATED;
+
 
 DestroyString(Token);
 return(result);
 }
 
-
+void SessionClose(TSession *Session)
+{
+#ifdef HAVE_LIBPAM
+void AuthPAMClose();
+#endif
+}
 
 

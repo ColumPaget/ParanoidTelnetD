@@ -14,6 +14,7 @@
 #define FLAG_AUTHENTICATED 1
 #define FLAG_UNMOUNT 16
 #define FLAG_DENYAUTH 32
+#define FLAG_SESSION_PAM 64
 
 //Settings flags
 #define FLAG_NOAUTH 1
@@ -31,6 +32,7 @@
 #define FLAG_HONEYPOT 4096
 #define FLAG_CHALLENGE 8192
 #define FLAG_ERROR 134217728
+
 
 typedef struct
 {

@@ -17,6 +17,6 @@ char *GetUserHomeDir(char *UserName);
 
 int UpdateNativeFile(char *Path, char *Name, char *PassType, char *Pass, char *HomeDir, char *RealUser, char *Shell, char *Args);
 void ListNativeFile(char *Path);
-
+void SessionClose(TSession *Session);
 
 #endif

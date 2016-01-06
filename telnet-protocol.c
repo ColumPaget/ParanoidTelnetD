@@ -107,9 +107,9 @@ unsigned char *ptr;
 			break;
 
 			case TELNET_WINSIZE:
-				STREAMReadBytes(S,&Word,2);
+				STREAMReadBytes(S,(char *) &Word,2);
 				Settings.WinWidth=ntohs(Word);
-				STREAMReadBytes(S,&Word,2);
+				STREAMReadBytes(S,(char *) &Word,2);
 				Settings.WinLength=ntohs(Word);
 				STREAMReadChar(S);
 				STREAMReadChar(S);
@@ -121,11 +121,11 @@ unsigned char *ptr;
 }
 
 
-int TelnetHandleChar(STREAM *S, char *Data, int len, int inchar, char *EchoStr, int Flags)
+int TelnetHandleChar(STREAM *S, char *Data, int len, char inchar, char *EchoStr, int Flags)
 {
 struct timeval tv;
 
-	Data[len]=inchar & 0xFF;
+	Data[len]=inchar;
 
 	if (Flags & TNRB_DISCARD_NEXT_CHAR)
 	{
@@ -150,7 +150,7 @@ int TelnetReadBytes(STREAM *S, char *Data, int max, int Flags)
 int inchar;
 int len=0;
 int result=0;
-
+char tmpChr;
 
 while (1)
 {
@@ -175,12 +175,12 @@ case TELNET_IAC:
 break;
 
 case '\n':
-	return(TelnetHandleChar(S, Data, len, inchar, NULL, 0));
+	return(TelnetHandleChar(S, Data, len, inchar & 0xFF, NULL, 0));
 break;
 
 case '\r':
-	if (Flags & TNRB_NOPTY) return(TelnetHandleChar(S, Data, len, inchar, "\r\n", Flags | TNRB_DISCARD_NEXT_CHAR));
-	else len=TelnetHandleChar(S, Data, len, inchar, NULL, Flags);
+	if (Flags & TNRB_NOPTY) return(TelnetHandleChar(S, Data, len, inchar & 0xFF, "\r\n", Flags | TNRB_DISCARD_NEXT_CHAR));
+	else len=TelnetHandleChar(S, Data, len, inchar & 0xFF, NULL, Flags);
 break;
 
 case '\b':
@@ -188,14 +188,15 @@ case TELNET_BACKSPACE:
 	if (Flags & TNRB_NOPTY) 
 	{
 			len--;
-			STREAMWriteBytes(S,&inchar,1);
+			tmpChr=inchar & 0xFF;
+			STREAMWriteBytes(S,&tmpChr,1);
 			STREAMFlush(S);
 	}
-	else len=TelnetHandleChar(S, Data, len, inchar, NULL, Flags);
+	else len=TelnetHandleChar(S, Data, len, inchar & 0xFF, NULL, Flags);
 break;
 
 default:
-	len=TelnetHandleChar(S, Data, len, inchar, NULL, Flags);
+	len=TelnetHandleChar(S, Data, len, inchar & 0xFF, NULL, Flags);
 break;
 }
 

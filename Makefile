@@ -28,7 +28,14 @@ common.o: common.c common.h
 	gcc -g -c common.c
 
 clean:
-	rm -f *.o */*.o */*.a */*.so $(EXE)
+	-rm -f *.o */*.o */*.a */*.so $(EXE)
+	-rm -f config.log config.status */config.log */config.status
+	-rm -fr autom4te.cache */autom4te.cache
+
+distclean:
+	-rm -f *.o */*.o */*.a */*.so $(EXE)
+	-rm -f config.log config.status */config.log */config.status Makefile */Makefile
+	-rm -fr autom4te.cache */autom4te.cache
 
 install:
 	@mkdir -p /usr/sbin
