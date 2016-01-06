@@ -1,7 +1,7 @@
 ParanoidTelnetD: version 0.1
 Author: Colum Paget
 Email: colums.projects@gmail.com
-Blog: http://idratherhack.blogspot.com
+Website: http://www.cjpaget.co.uk
 
 
 DISCLAIMER:
@@ -75,18 +75,21 @@ AUTHENTICATION.
    ptelnetd can use a number of different authentication methods, which can be set with the '-auth-types' command line option. Available types are: 
 
   native     The default method. Uses ptelnetd's native authentication file (specified with -auth-file, defaults to /etc/ptelnetd.auth) to authenticate.
-  pam        Use Pluggable Authentication Modules.
-  shadow     Authenticate against passwords in /etc/shadow.
-  passwd     Authenticate against passwords in /etc/passwd.
-  cr-md5     Challenge/Response using native file passwords and md5 hashing.
-  cr-sha1    Challenge/Response using native file passwords and sha1 hashing.
-  cr-sha256  Challenge/Response using native file passwords and sha256 hashing.
-  cr-sha512  Challenge/Response using native file passwords and sha512 hashing.
-  open       NO AUTHENTICATION. This method has certain restrictions.
+  pam         Use Pluggable Authentication Modules.
+  shadow      Authenticate against passwords in /etc/shadow.
+  passwd      Authenticate against passwords in /etc/passwd.
+  cr-md5      Challenge/Response using native file passwords and md5 hashing.
+  cr-sha1     Challenge/Response using native file passwords and sha1 hashing.
+  cr-sha256   Challenge/Response using native file passwords and sha256 hashing.
+  cr-sha512   Challenge/Response using native file passwords and sha512 hashing.
+	pam-account Authenticate by any means, but check if PAM thinks the account is allowed/valid.
+  open        NO AUTHENTICATION. This method has certain restrictions.
 
     'open' authentication can only be used in combination with either -chroot or -chhome. Without some form of chroot jail, 'open' authentication would allow anyone to get a shell on your system without logging in, which would be a Bad Thing.
 
     'native' authentication is set up using the 'ptelnetd -user add/delete/list' commands. The default authentication file is /etc/ptelnetd, but this can be overridden with the '-auth-file' option.
+
+		'pam-account' doesn't authenticate, instead authentication is performed by other means, and pam-account then checks if PAM thinks the account is allowed to log in, even if it authenticated. This might be used if a .nologin flag was set, or if a user is only allowed to log in from certain hosts, or at certain times of day.
 
     'cr-md5', 'cr-sha1', 'cr-sha256', 'cr-sha512'. These are challenge-response authentication types. They require a password stored in PLAINTEXT in the native authentication file. When any of these authentication types are active the ptelnetd server sends a 'Challenge' string on the line before the 'login' prompt. The user authenticates by concatanating their password to the Challenge string (seperated by a colon) and then hashing the entire resulting string with the specified hash function. They submit this hashed string at the hash prompt. These hash strings can be created using utilites like 'md5sum' or 'sha512sum' by doing: 'echo -n 4+SiluCNxtX/CfM1jGnnK2JiunOnwnlz:MyPassword | md5sum' Where the long string before the colon is the Challenge obtained from the server, and 'MyPassword' is the users password.
 

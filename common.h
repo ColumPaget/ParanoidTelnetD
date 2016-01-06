@@ -14,7 +14,7 @@
 #define FLAG_AUTHENTICATED 1
 #define FLAG_UNMOUNT 16
 #define FLAG_DENYAUTH 32
-#define FLAG_SESSION_PAM 64
+#define FLAG_PAM_ACCOUNT 64
 
 //Settings flags
 #define FLAG_NOAUTH 1

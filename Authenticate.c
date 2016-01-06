@@ -589,7 +589,7 @@ if (! CheckServerAllowDenyLists(Session->User)) return(FALSE);
 ptr=GetToken(Settings.AuthMethods,",",&Token,0);
 while (ptr)
 {
-  if (strcasecmp(Token,"session-pam")==0) Session->Flags |= FLAG_SESSION_PAM;
+  if (strcasecmp(Token,"pam-account")==0) Session->Flags |= FLAG_PAM_ACCOUNT;
   ptr=GetToken(ptr,",",&Token,0);
 }
 
@@ -606,6 +606,7 @@ while (ptr)
 	else if (strcasecmp(Token,"pam")==0) 
 	{
 		result=AuthPAM(Session);
+		if (result) Session->Flags |= FLAG_PAM_ACCOUNT;
 	}
 	#endif
 
@@ -650,7 +651,7 @@ if (result)
 
 
 //check again, because may have changed in above block
-if (result && (Session->Flags & FLAG_SESSION_PAM))
+if (result && (Session->Flags & FLAG_PAM_ACCOUNT))
 {
 #ifdef HAVE_LIBPAM
   if (! AuthPAMCheckSession(Session))

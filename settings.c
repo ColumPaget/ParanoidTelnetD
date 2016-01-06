@@ -90,6 +90,7 @@ printf("  %- 10s %s\n", "cr-md5","Challenge/Response using native file passwords
 printf("  %- 10s %s\n", "cr-sha1","Challenge/Response using native file passwords and sha1 hashing.");
 printf("  %- 10s %s\n", "cr-sha256","Challenge/Response using native file passwords and sha256 hashing.");
 printf("  %- 10s %s\n", "cr-sha512","Challenge/Response using native file passwords and sha512 hashing.");
+printf("  %- 10s %s\n", "pam-account","Authenticate by any means, but check if PAM thinks the account is allowed/valid.");
 printf("  %- 10s %s\n", "open","NO AUTHENTICATION. This method has certain restrictions.");
 printf("\n    'open' authentication can only be used in combination with either -chroot or -chhome. Without some form of chroot jail, 'open' authentication would allow anyone to get a shell on your system without logging in, which would be a Bad Thing.\n\n");
 printf("    'native' authentication is set up using the 'ptelnetd -user add/delete/list' commands. The default authentication file is /etc/ptelnetd, but this can be overridden with the '-auth-file' option.\n\n");
