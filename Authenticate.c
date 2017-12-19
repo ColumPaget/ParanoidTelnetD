@@ -19,9 +19,10 @@ pam_handle_t *pamh=NULL;
 
 char *AuthenticationsTried=NULL;
 
-int CheckServerAllowDenyLists(char *UserName)
+int CheckServerAllowDenyLists(const char *UserName)
 {
-char *ptr, *Token=NULL;
+char *Token=NULL;
+const char *ptr;
 
 if (StrLen(Settings.DenyUsers))
 {
@@ -32,7 +33,7 @@ while (ptr)
 	if (strcmp(Token,UserName)==0)
 	{
 		syslog(Settings.ErrorLogLevel,"UserName '%s' in 'DenyUsers' list. Login Denied",UserName);
-		DestroyString(Token);
+		Destroy(Token);
 		return(FALSE);
 	}
 	ptr=GetToken(ptr,"\\S",&Token,GETTOKEN_QUOTES);
@@ -42,7 +43,7 @@ while (ptr)
 
 if (! StrLen(Settings.AllowUsers))
 {
-DestroyString(Token);
+Destroy(Token);
 return(TRUE);
 }
 
@@ -52,7 +53,7 @@ while (ptr)
 	if (strcmp(Token,UserName)==0)
 	{
 		syslog(Settings.ErrorLogLevel,"UserName '%s' Found in 'AllowUsers' list.",UserName);
-		DestroyString(Token);
+		Destroy(Token);
 		return(TRUE);
 	}
 	ptr=GetToken(ptr,"\\S",&Token,GETTOKEN_QUOTES);
@@ -143,8 +144,8 @@ else if (StrLen(Session->Password) && StrLen(pass_struct->sp_pwdp))
 if (result) Session->RealUser=CopyStr(Session->RealUser,Session->User);
 
 #endif
-DestroyString(Salt);
-DestroyString(Digest);
+Destroy(Salt);
+Destroy(Digest);
 
 return(result);
 }
@@ -222,7 +223,6 @@ AuthenticationsTried=CatStr(AuthenticationsTried,"pam ");
 
 if(! PAMStart(Session, Session->User))
   {
-    LogToFile(Settings.LogPath,"PAM: No such user %s",Session->User);
     return(USER_UNKNOWN);
 }
 
@@ -287,7 +287,7 @@ return(Possibilities[i]);
 
 
 
-int NativeFileCheckPassword(char *Name, char *PassType, char *Salt, char *Password, char *ProvidedPass)
+int NativeFileCheckPassword(const char *Name, const char *PassType, const char *Salt, const char *Password, const char *ProvidedPass)
 {
 char *Digest=NULL, *Tempstr=NULL, *Token=NULL, *ptr;
 int result=FALSE;
@@ -297,7 +297,11 @@ if (! Password) return(FALSE);
 if (! ProvidedPass) return(FALSE);
 
 if (strcmp(PassType,"null")==0) return(TRUE);
-if ((strcmp(PassType,"plain")==0) && (strcmp(Password,ProvidedPass)==0)) return(TRUE);
+if (strcmp(PassType,"plain")==0) 
+{
+	if(strcmp(Password,ProvidedPass)==0) return(TRUE);
+	return(FALSE);
+}
 
 if (strncmp(PassType,"cr-",3)==0)
 {
@@ -319,9 +323,9 @@ else  if (StrLen(PassType) && StrLen(ProvidedPass))
   if (StrLen(Digest) && (strcmp(Password,Digest)==0)) result=TRUE;
 }
 
-DestroyString(Tempstr);
-DestroyString(Digest);
-DestroyString(Token);
+Destroy(Tempstr);
+Destroy(Digest);
+Destroy(Token);
 
 return(result);
 }
@@ -329,11 +333,11 @@ return(result);
 
 
 
-int AuthNativeFile(TSession *Session, char *AuthType)
+int AuthNativeFile(TSession *Session, const char *AuthType)
 {
 STREAM *S;
-char *Tempstr=NULL,*ptr;
-char *Name=NULL, *Pass=NULL, *RealUser=NULL, *HomeDir=NULL, *PassType=NULL, *Salt=NULL, *Shell=NULL;
+char *Tempstr=NULL, *Name=NULL, *Pass=NULL, *RealUser=NULL, *HomeDir=NULL, *PassType=NULL, *Salt=NULL, *Shell=NULL, *ProcessConfig=NULL;
+const char *ptr;
 int RetVal=USER_UNKNOWN;
 struct passwd *pass_struct;
 
@@ -341,7 +345,7 @@ AuthenticationsTried=MCatStr(AuthenticationsTried,AuthType," ",NULL);
 
 if (StrLen(Settings.AuthFile))
 {
-S=STREAMOpenFile(Settings.AuthFile,O_RDONLY);
+S=STREAMFileOpen(Settings.AuthFile,O_RDONLY);
 if (! S) return(USER_UNKNOWN);
 
 Tempstr=STREAMReadLine(Tempstr,S);
@@ -364,8 +368,8 @@ while (Tempstr)
 	ptr=GetToken(ptr,":",&RealUser,0);
 	ptr=GetToken(ptr,":",&HomeDir,0);
 	ptr=GetToken(ptr,":",&Shell,0);
+	ptr=GetToken(ptr,":",&ProcessConfig,0);
 	
-
   if (strcasecmp(Name,Session->User)==0)
   {
 		RetVal=FALSE;
@@ -376,8 +380,9 @@ while (Tempstr)
 			Session->RealUser=CopyStr(Session->RealUser,RealUser);	
 			if (StrLen(HomeDir)) Session->HomeDir=CopyStr(Session->HomeDir,HomeDir);	
 			if (StrLen(Shell)) Session->Shell=CopyStr(Session->Shell,Shell);	
+			if (StrLen(ProcessConfig)) Session->ProcessConfig=CopyStr(Session->ProcessConfig,ProcessConfig);
+			break;
     }
-		break;
   }
 
   Tempstr=STREAMReadLine(Tempstr,S);
@@ -385,25 +390,27 @@ while (Tempstr)
 STREAMClose(S);
 }
 
-DestroyString(Tempstr);
-DestroyString(Name);
-DestroyString(Pass);
-DestroyString(Salt);
-DestroyString(Shell);
-DestroyString(HomeDir);
-DestroyString(RealUser);
-DestroyString(PassType);
+Destroy(Tempstr);
+Destroy(Name);
+Destroy(Pass);
+Destroy(Salt);
+Destroy(Shell);
+Destroy(HomeDir);
+Destroy(RealUser);
+Destroy(PassType);
+Destroy(ProcessConfig);
 
 return(RetVal);
 }
 
 
-void ListNativeFile(char *Path)
+void ListNativeFile(const char *Path)
 {
 STREAM *S;
-char *Tempstr=NULL, *Token=NULL, *SendStr=NULL, *ptr;
+char *Tempstr=NULL, *Token=NULL, *SendStr=NULL;
+const char *ptr;
 
-S=STREAMOpenFile(Settings.AuthFile,O_RDONLY);
+S=STREAMFileOpen(Settings.AuthFile,O_RDONLY);
 if (S)
 {
   Tempstr=STREAMReadLine(Tempstr,S);
@@ -428,9 +435,9 @@ if (S)
 }
 
 
-DestroyString(Tempstr);
-DestroyString(SendStr);
-DestroyString(Token);
+Destroy(Tempstr);
+Destroy(SendStr);
+Destroy(Token);
 }
 
 
@@ -457,31 +464,30 @@ else
   fprintf(stderr,"WARNING: Failed to open /dev/random. Using less secure 'generated' salt for password.\n");
 }
 
-DestroyString(Tempstr);
+Destroy(Tempstr);
 
 return(RetStr);
 }
 
 
 
-int UpdateNativeFile(char *Path, char *Name, char *PassType, char *Pass, char *HomeDir, char *RealUser, char *Shell, char *Args)
+int UpdateNativeFile(const char *Path, const char *Name, const char *PassType, const char *Pass, const char *HomeDir, const char *RealUser, const char *Shell, const char *Args, int Action)
 {
 STREAM *S;
 ListNode *Entries;
 char *Tempstr=NULL, *Token=NULL, *Salt=NULL;
+int RetVal=FALSE;
 ListNode *Curr;
-int RetVal=ERR_FILE;
 
 Entries=ListCreate();
-S=STREAMOpenFile(Settings.AuthFile,O_RDONLY);
+S=STREAMFileOpen(Settings.AuthFile,O_RDONLY);
 if (S)
 {
 	Tempstr=STREAMReadLine(Tempstr,S);
 	while (Tempstr)
 	{
 		GetToken(Tempstr,":",&Token,0);
-
-		if (strcmp(Token,Name) !=0) ListAddItem(Entries,CopyStr(NULL,Tempstr));	
+		if (strcmp(Token, Name) != 0) ListAddNamedItem(Entries,Token,CopyStr(NULL,Tempstr));	
 	
 		Tempstr=STREAMReadLine(Tempstr,S);
 	}
@@ -491,20 +497,20 @@ if (S)
 
 if (StrLen(Settings.AuthFile))
 {
-	S=STREAMOpenFile(Settings.AuthFile,O_WRONLY| O_CREAT | O_TRUNC);
+	S=STREAMFileOpen(Settings.AuthFile,O_WRONLY| O_CREAT | O_TRUNC);
 	if (S)
 	{
 	//First copy all other entries
 	Curr=ListGetNext(Entries);
 	while (Curr)
 	{
-		STREAMWriteLine((char *) Curr->Item,S);
+		STREAMWriteLine((char *) Curr->Item, S);
 		Curr=ListGetNext(Curr);
 	}
 	STREAMFlush(S);
 
 
-	if (strcmp(PassType,"delete")==0)
+	if (Action==NATIVEFILE_USER_DEL)
 	{
 		//Don't bother to write new entry, effectively deleting user
 	}
@@ -529,21 +535,21 @@ if (StrLen(Settings.AuthFile))
 	}
 
 	STREAMClose(S);
-	RetVal=ERR_OKAY;
+	RetVal=TRUE;
 	}
 }
 
-DestroyString(Tempstr);
-DestroyString(Token);
-DestroyString(Salt);
+Destroy(Tempstr);
+Destroy(Token);
+Destroy(Salt);
 
-ListDestroy(Entries,DestroyString);
+ListDestroy(Entries,Destroy);
 
 return(RetVal);
 }
 
 
-int CheckUserExists(char *UserName)
+int CheckUserExists(const char *UserName)
 {
 TSession *Session;
 int result=FALSE;
@@ -558,8 +564,8 @@ if (AuthPasswordFile(Session) != USER_UNKNOWN) result=TRUE;
 if (AuthShadowFile(Session) != USER_UNKNOWN) result=TRUE;
 if (AuthNativeFile(Session, "") != USER_UNKNOWN) result=TRUE;
 
-DestroyString(Session->User);
-DestroyString(Session->Password);
+Destroy(Session->User);
+Destroy(Session->Password);
 
 free(Session);
 
@@ -572,7 +578,8 @@ return(result);
 int Authenticate(TSession *Session)
 {
 int result=0;
-char *Token=NULL, *ptr;
+char *Token=NULL;
+const char *ptr;
 struct passwd *pwent;
 
 AuthenticationsTried=CopyStr(AuthenticationsTried,"");
@@ -654,20 +661,18 @@ if (result)
 if (result && (Session->Flags & FLAG_PAM_ACCOUNT))
 {
 #ifdef HAVE_LIBPAM
-  if (! AuthPAMCheckSession(Session))
-  {
-    LogToFile(Settings.LogPath,"PAM Account invalid for '%s'. Login Denied",Session->User);
-    result=FALSE;
-  }
+  if (! AuthPAMCheckSession(Session)) result=FALSE;
 #endif
 }
 
 if (result==TRUE) Session->Flags |= FLAG_AUTHENTICATED;
 
 
-DestroyString(Token);
+Destroy(Token);
 return(result);
 }
+
+
 
 void SessionClose(TSession *Session)
 {

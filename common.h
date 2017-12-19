@@ -1,9 +1,9 @@
 #ifndef PARANOID_TELNETD_H
 #define PARANOID_TELNETD_H
 
-#include "libUseful-2.0/libUseful.h"
+#include "libUseful-3/libUseful.h"
 
-#define VERSION "0.4"
+#define VERSION "2.0"
 
 #define ERR_OKAY 0
 #define ERR_FILE 1
@@ -30,7 +30,8 @@
 #define FLAG_FORCE_REALUSER 1024
 #define FLAG_FORCE_SHELL 2048
 #define FLAG_HONEYPOT 4096
-#define FLAG_CHALLENGE 8192
+#define FLAG_LOGCREDS 8192
+#define FLAG_CHALLENGE 16384
 #define FLAG_ERROR 134217728
 
 
@@ -50,6 +51,10 @@ char *ServerIP;
 char *Shell;
 time_t LastActivity;
 char *Challenge;
+char *ProcessConfig;
+char *TermType;
+int TermWidth;
+int TermHeight;
 STREAM *S;
 } TSession;
 
@@ -62,22 +67,20 @@ char *AllowIPs;
 char *DenyIPs;
 char *AllowMACs;
 char *DenyMACs;
-char *LogPath;
+char *LogID;
 char *AuthFile;
 char *AuthMethods;
 char *ChDir;
 char *Interface;
 char *RealUser;
-char *BindMounts;
 char *Banner;
 char *Environment;
 char *DynamicHomeDir;
 char *DefaultShell;
-char *TermType;
 char *LoginScript;
 char *LogoutScript;
 char *PidFile;
-int WinWidth, WinLength;
+char *ProcessConfig;
 ListNode *BlockHosts;
 int Port;
 int AuthTries;

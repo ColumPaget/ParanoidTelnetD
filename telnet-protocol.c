@@ -50,8 +50,10 @@ void TelnetHandleNegotiation(STREAM *S)
 int DoWill, Type;
 uint16_t Word;
 unsigned char *ptr;
+TSession *Session;
 
 	//Read past IAC
+	Session=(TSession *) STREAMGetItem(S,"Session");
 	DoWill=STREAMReadChar(S);
 	Type=STREAMReadChar(S);
 
@@ -96,25 +98,25 @@ unsigned char *ptr;
 			case TELNET_TERMTYPE:
 				//send or is
 				DoWill=STREAMReadChar(S);
-				Settings.TermType=STREAMReadToTerminator(Settings.TermType,S,TELNET_IAC);
+				Session->TermType=STREAMReadToTerminator(Session->TermType,S,TELNET_IAC);
 				//Strip IAC
-				ptr=Settings.TermType + StrLen(Settings.TermType) -1;
+				ptr=Session->TermType + StrLen(Session->TermType) -1;
 				if (*ptr==TELNET_IAC) *ptr='\0';
-				StripTrailingWhitespace(Settings.TermType);
-				strlwr(Settings.TermType);
+				StripTrailingWhitespace(Session->TermType);
+				strlwr(Session->TermType);
 				STREAMReadChar(S); 
-				if (Settings.Flags & FLAG_DEBUG) syslog(LOG_DEBUG,"RECEIVED TERMINALTYPE: %s",Settings.TermType);
+				if (Settings.Flags & FLAG_DEBUG) syslog(LOG_DEBUG,"RECEIVED TERMINALTYPE: %s",Session->TermType);
 			break;
 
 			case TELNET_WINSIZE:
 				STREAMReadBytes(S,(char *) &Word,2);
-				Settings.WinWidth=ntohs(Word);
+				Session->TermWidth=ntohs(Word);
 				STREAMReadBytes(S,(char *) &Word,2);
-				Settings.WinLength=ntohs(Word);
+				Session->TermHeight=ntohs(Word);
 				STREAMReadChar(S);
 				STREAMReadChar(S);
-				if (Settings.Flags & FLAG_DEBUG) syslog(LOG_DEBUG,"RECEIVED WINDOW SIZE: %dx%d",Settings.WinWidth,Settings.WinLength);
-				Settings.Flags |= FLAG_WINSIZE;
+				if (Settings.Flags & FLAG_DEBUG) syslog(LOG_DEBUG,"RECEIVED WINDOW SIZE: %dx%d", Session->TermWidth, Session->TermHeight);
+				Session->Flags |= FLAG_WINSIZE;
 			break;	
 		}
 	}

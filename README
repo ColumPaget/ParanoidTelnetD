@@ -1,4 +1,4 @@
-ParanoidTelnetD: version 0.1
+ParanoidTelnetD:
 Author: Colum Paget
 Email: colums.projects@gmail.com
 Website: http://www.cjpaget.co.uk
@@ -6,7 +6,7 @@ Website: http://www.cjpaget.co.uk
 
 DISCLAIMER:
 
-  This is free software. It comes with no guarentees and I take no responsiblity if it makes your computer explode or opens a portal to the demon dimensions, or does anything. It is released under the Gnu Public Licence.
+  This is free software. It comes with no guarentees and I take no responsiblity if it makes your computer explode or opens a portal to the demon dimensions, or does anything. It is released under the Gnu Public Licence version 3.
 
 
 SYNOPSIS:
@@ -64,7 +64,7 @@ Defaults to /bin/sh, which is overridden by entries in /etc/passwd if system aut
 -m <dir list>                     list of directories to 'bind mount' in user's home dir. See 'BIND MOUNTS' below
 -mounts <dir list>                list of directories to 'bind mount' in user's home dir. See 'BIND MOUNTS' below
 -honeypot                         'Honeypot' mode. Fail to authenticate any user, even if they've got the right password, and log EVERYTHING as critical. See 'HONEYPOT MODE' below.
--user add [-a <auth file> <username> <password> [-encrypt <encryption type>] [-home <home directory>] [-shell <shell>] 'Add a user to the config file. -encrypt sets the type of encryption used to protect the stored password. Default is 'sha1', other options are 'md5', 'sha256' and 'sha512'.
+-user add [-a <auth file> <username> <password> [-encrypt <encryption type>] [-home <home directory>] [-shell <shell>] [-conf <config>]' Add a user to the config file. -encrypt sets the type of encryption used to protect the stored password. Default is 'sha1', other options are 'md5', 'sha256' and 'sha512'. '-conf' adds various configurations for that user (chroot, containers, etc).
 -user del [-a <auth file> <username> 'Delete a user from the config file.
 -user list [-a <auth file>        List users in the config file.
 
@@ -133,7 +133,10 @@ Available variables are:
 CHROOT AND CHHOME
 
 	Paranoid TelnetD supports two types of chroot jail. 'ChHome' happens after login, and chroots the user's shell into their home directory. This means that the user sees themselves locked into their home directory, which is now their root directory. However, the user's connection is serviced by a helper process that exists outside of the chhome jail, so that when the user logs off the 'Logout script' can be run to take any files out of the chhome jail and import them into applications on the main system (see LOGIN/LOGOUT SCRIPTS below). In this mode authentication, login/logout scripting, bind mounts and dynamic home directories are all processed OUTSIDE of and BEFORE chhome.
+
 	The other type of chroot is configured with the '-chroot <path>' command-line argument. This chroots the helper process and the shell into the specified directory. This means that everything that happens is locked into the chroot directory. This is intended for systems where there's an entire OS installation (a traditional chroot environment) that everything should be locked into. This has impacts on authentication, as all the authentication files must now be in the chroot directory; 'dynhome', because the dynamic home directory will be created relative to the chroot, 'Bind mounts', as the mounted directories will be relative to chroot, and 'login/logout scripts', as these scripts too must be installed in the chroot.
+
+	Chroot can also be set on a per user basis when using 'native' authentication with the 'ptelnetd user -add' command, and where supported more advanced types of containment like linux containers can be activated. See 'USER SETTINGS' below for more details.
 
 
 
@@ -154,6 +157,31 @@ LOGIN/LOGOUT SCRIPTS
    The '-login-script' and '-logout-script' options allow scripts to be run on login/logout respectively. These scripts are run *outside* of the 'chhome' style of chroot, allowing the login script to copy things into the user's chroot-jail, then the user is chrooted into it, and when their session ends the logout script can import/copy files from the jail to the larger system.
 
 
+USER SETTINGS
+
+	When using 'native' authentication various configurations can be setup against a particular username/password combination. These can be set using the 'ptelnetd -user add -conf' method or, if brave, by editing the .auth file's last field. Configuration options are a space separated list of:
+
+chroot=<path>     chroot session into <path>
+
+
+ns=<path>       linux namespace to join. <path> is either a path to a namespace file, or a path to a directory (e.g. /proc/<pid>/ns ) that contains namespace descriptor files
+
+container       this uses linux containers (if supported). It creates a new directory, mounts read-only copies of /bin /lib /usr/lib in it, chroots into it, switches to a new namespace for network (which disallows all network access), IPC, processes, and uname values. 
+                This results in a session that sees no network, no other processes on the system (except for a local 'init' that serves the session) no IPC, and which only has read-only access to a few directories, and write access only to the temporary directory it's living in.
+
++net            When used in combination with 'container' this allows the container to have normal network access, all other restrictions still apply
+
+nice=value      'nice' value of session
+prio=value       scheduling priority of session (equivalent to 0 - nice value)
+priority=value   scheduling priority of session (equivalent to 0 - nice value)
+mem=value        resource limit for memory (data segment) in session
+fsize=value      resource limit for filesize in session
+files=value      resource limit for open files in session
+coredumps=value  resource limit for max size of coredump files in session
+procs=value      resource limit for max number of processes ON A PER USER BASIS.
+
+
+	
 
 HONEYPOT MODE
 

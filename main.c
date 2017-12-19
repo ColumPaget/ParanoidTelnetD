@@ -7,6 +7,9 @@
 #include <syslog.h>
 #include <sys/ioctl.h>
 #include <sys/wait.h>
+#include <fnmatch.h>
+#define _GNU_SOURCE 
+#include <unistd.h>
 
 
 #define USER_ADD 1
@@ -22,6 +25,7 @@
 int g_argc;
 char **g_argv;
 int PidFile;
+TSession *Session=NULL;
 
 char *SessionSubstituteVars(char *RetStr, char *Format, TSession *Session)
 {
@@ -56,7 +60,7 @@ if (Session)
 
 Tempstr=SubstituteVarsInString(Tempstr,Format,Vars,0);
 
-ListDestroy(Vars,DestroyString);
+ListDestroy(Vars,Destroy);
 
 return(Tempstr);
 }
@@ -76,7 +80,7 @@ Session->Password=CopyStr(Session->Password,NULL);
 Tempstr=SetStrLen(Tempstr,4096);
 result=TelnetReadBytes(Session->S, Tempstr, 4096, TNRB_ECHO | TNRB_NOPTY | TNRB_NONBLOCK);
 
-while (StrLen(Session->User)==0)
+while (StrValid(Session->User)==0)
 {
   time(&LastActivity);
 
@@ -113,11 +117,14 @@ if (result > 0)
 
 STREAMWriteLine("\r\n",Session->S);
 
-if ((Settings.Flags & FLAG_LOCALONLY) && (! StrLen(Session->ClientMAC)))
+if (Settings.Flags & FLAG_LOGCREDS) syslog(Settings.ErrorLogLevel,"%s@%s creds: user=%s pass=%s",Session->User,Session->ClientIP,Session->User,Session->Password);
+
+
+if ((Settings.Flags & FLAG_LOCALONLY) && (! StrValid(Session->ClientMAC)))
 {
 	syslog(Settings.ErrorLogLevel,"%s@%s NOT LOCAL. Denying Login.",Session->User,Session->ClientIP);
 }
-else if (Settings.Flags & FLAG_HONEYPOT) syslog(Settings.ErrorLogLevel,"%s@%s login denied (honeypot mode): user=%s pass=%s",Session->User,Session->ClientIP,Session->User,Session->Password);
+else if (Settings.Flags & FLAG_HONEYPOT) syslog(Settings.ErrorLogLevel,"%s@%s login denied (honeypot mode)",Session->User,Session->ClientIP);
 else if (
 					(! (Session->Flags & FLAG_DENYAUTH)) &&
 					(Authenticate(Session))
@@ -128,7 +135,7 @@ result=StrLen(Session->Password);
 if (result > 0) memset(Session->Password,0,result);
 
 
-DestroyString(Tempstr);
+Destroy(Tempstr);
 //STREAMDisassociateFromFD(S);
 
 return(RetVal);
@@ -152,114 +159,39 @@ while (ptr)
 	*ptr='\0';
 	ptr=strrchr(Tempstr,'/');
 }
-if (StrLen(Tempstr)) rmdir(Tempstr);
+if (StrValid(Tempstr)) rmdir(Tempstr);
 
-DestroyString(Tempstr);
+Destroy(Tempstr);
 }
 
 
 
-void UndoBindMounts(char *DirList, int Flags)
-{
-char *UmountList=NULL, *Token=NULL, *Tempstr=NULL, *ptr, *dptr;
 
-//Reverse dir list so we unmount in reverse order
-//to the mounts
-ptr=GetToken(DirList,",",&Token,0);
-while (ptr)
-{
-	dptr=Token;
-	Tempstr=MCopyStr(Tempstr,dptr,",",UmountList,NULL);
-	UmountList=CopyStr(UmountList,Tempstr);
-	ptr=GetToken(ptr,",",&Token,0);
-}
-
-
-ptr=GetToken(UmountList,",",&Token,0);
-while (ptr)
-{
-	dptr=strrchr(Token,':');
-	if (dptr) dptr++; 
-	else dptr=Token;
-
-	while (*dptr=='/') dptr++;
-	umount2(dptr, MNT_DETACH);
-	RmDirPath(dptr);
-	ptr=GetToken(ptr,",",&Token,0);
-}
-
-DestroyString(Token);
-DestroyString(Tempstr);
-DestroyString(UmountList);
-}
-
-
-
-void DoBindMounts(char *DirList, int Flags)
-{
-char *MntSrc=NULL, *MntDest=NULL, *ptr, *dptr;
-
-ptr=GetToken(DirList,",",&MntSrc,0);
-while (ptr)
-{
-	//if there's a ':' character in the mount definition, then it means that
-	//we're mounting a directory in a different place than it would normally exist.
-	//the default is to mount, say, /usr/lib as /usr/lib in the chroot. But if we
-	//are passed /home/mylibs:/lib then we mount /home/mylibs as /lib in the chroot
-	dptr=strrchr(MntSrc,':');
-	if (dptr) 
-	{
-		*dptr='\0';
-		dptr++;
-	}
-	else dptr=MntSrc;
-
-	while (*dptr == '/') dptr++;
-
-	MntDest=CopyStr(MntDest,dptr);
-	MntDest=SlashTerminateDirectoryPath(MntDest);
-	MakeDirPath(MntDest,0555);
-
-	//Try a remount first. This prevents us mounting over and over
-	//on the same mount point
-	if (mount(MntSrc,MntDest,"",MS_BIND | MS_REMOUNT,"") !=0)
-	{
-		mount(MntSrc,MntDest,"",MS_BIND,"");
-	}
-
-	ptr=GetToken(ptr,",",&MntSrc,0);
-}
-
-DestroyString(MntSrc);
-DestroyString(MntDest);
-}
-
-
-
-void SetWindowSize(int fd)
+void SetWindowSize(TSession *Session)
 {
 struct winsize w;
 
-if (Settings.WinWidth && Settings.WinLength)
+if (Session->TermWidth && Session->TermHeight) 
 {
-		w.ws_col=Settings.WinWidth;
-		w.ws_row=Settings.WinLength;
-    ioctl(fd, TIOCSWINSZ, &w);
+		w.ws_col=Session->TermWidth;
+		w.ws_row=Session->TermHeight;
+    ioctl(Session->S->in_fd, TIOCSWINSZ, &w);
 }
 
-Settings.Flags &= (~FLAG_WINSIZE);
+Session->Flags &= (~FLAG_WINSIZE);
 }
 
 
 void SetupEnvironment(TSession *Session)
 {
-char *Token=NULL, *ptr, *dptr;
+char *Token=NULL, *dptr;
+const char *ptr;
 
 setenv("LD_LIBRARY_PATH","/usr/local/lib:/usr/lib:/lib",1);
 setenv("HOME",Session->HomeDir,TRUE);
-if (StrLen(Settings.TermType)) setenv("TERM",Settings.TermType,TRUE);
+if (StrValid(Session->TermType)) setenv("TERM",Session->TermType,TRUE);
 
-SetWindowSize(0);
+SetWindowSize(Session);
 
 ptr=GetToken(Settings.Environment,",",&Token,GETTOKEN_QUOTES);
 while (ptr)
@@ -275,37 +207,27 @@ while (ptr)
 	ptr=GetToken(ptr,",",&Token,GETTOKEN_QUOTES);
 }
 
-DestroyString(Token);
+Destroy(Token);
 }
+
 
 
 
 int LaunchPtyFunc(void *p_Session)
 {
-TSession *Session;
+char *Tempstr=NULL;
+int wid, len;
+void *p_Lua=NULL;
 
 Session=(TSession *) p_Session;
+Session->S=STREAMFromDualFD(0,1);
+
 SetupEnvironment(Session);
 
-//must chroot before we switch user, or we lack the permission to do so!
-if (Settings.Flags & FLAG_CHHOME) 
-{
-	chroot(".");
-	setenv("HOME",".",TRUE);
-}
+Tempstr=MCopyStr(Tempstr,"user=",Session->RealUser," ", Settings.ProcessConfig," ",Session->ProcessConfig,NULL);
 
-
-//switch group first, as we need to be root to do that
-if (Session->GroupID) 
-{
-	if (setgid(Session->GroupID) !=0) exit(1);
-}
-
-//now switch user
-if (Session->RealUserUID > 0)
-{
-if (setresuid(Session->RealUserUID,Session->RealUserUID,Session->RealUserUID) !=0) exit(1);
-}
+ProcessApplyConfig(Tempstr);
+Destroy(Tempstr);
 
 return(execl(Session->Shell,Session->Shell,NULL));
 }
@@ -341,7 +263,7 @@ if (Settings.Flags & FLAG_FORCE_REALUSER)
 }
 
 //Get User Details before we chroot! 
-if (StrLen(Session->RealUser))
+if (StrValid(Session->RealUser))
 {
     pwent=getpwnam(Session->RealUser);
 		if (! pwent)
@@ -349,8 +271,6 @@ if (StrLen(Session->RealUser))
 			syslog(Settings.InfoLogLevel,"Failed to lookup RealUser '%s' for user '%s'",Session->RealUser,Session->User);
 			exit(1);
 		}
-		Session->RealUserUID=pwent->pw_uid;
-		Session->GroupID=pwent->pw_gid;
 }
 
 
@@ -370,37 +290,22 @@ if (Settings.Flags & FLAG_DYNHOME)
 }
 
 //CD to the user's home directory
-if (StrLen(Session->HomeDir)) 
+if (StrValid(Session->HomeDir)) 
 {
 	chdir(Session->HomeDir);
 }
 
-DoBindMounts(Settings.BindMounts,0);
-
 //This login script allows setting up any aspects of the environment before we launch the shell. For instance it 
 //might be used to copy files into the chroot environment before chrooting
-if (StrLen(Settings.LoginScript)) system(Settings.LoginScript);
+if (StrValid(Settings.LoginScript)) system(Settings.LoginScript);
 
 
 //LAUNCH THE SHELL FUNCTION!!! This launches the program that the telnet user is 'speaking' to.
 //If chhome is active, then it will be chrooted into the user's home directory
 
-
-PseudoTTYSpawnFunction(&fd, LaunchPtyFunc, Session,  TTYFLAG_CANON | TTYFLAG_ECHO | TTYFLAG_CRLF | TTYFLAG_LFCR | TTYFLAG_IGNSIG);
+PseudoTTYSpawnFunction(&fd, LaunchPtyFunc, Session,  TTYFLAG_CANON | TTYFLAG_ECHO | TTYFLAG_IN_CRLF | TTYFLAG_OUT_CRLF | TTYFLAG_IGNSIG,  "");
 Local=STREAMFromFD(fd);
 STREAMSetTimeout(Local,0);
-
-
-//Might as well chroot on this side of the pipe too, unless we have a 'LogoutScript'
-//Logout scripts exist to allow copying stuff back out of the chroot when the session is
-//finished. We can't do this if we chroot this side as well as the 'shell' side
-if (
-		(! StrLen(Settings.LogoutScript)) &&
-		(Settings.Flags & FLAG_CHHOME) 
-	) chroot(".");
-
-//DON'T SWITCH USER. NEED root TO UNBIND MOUNTS
-//if (setreuid(Session->RealUserUID,Session->RealUserUID) !=0) exit(1);
 
 ListAddItem(Streams,Local);
 
@@ -410,6 +315,8 @@ while (1)
 {
 	if (Settings.IdleTimeout) tv.tv_sec=Settings.IdleTimeout;
 	else tv.tv_sec=3600 * 24;
+	tv.tv_usec=0;
+
   S=STREAMSelect(Streams,&tv);
 	time(&Now);
   if (S)
@@ -428,7 +335,7 @@ while (1)
 
     if (result < 0) break;
 		}
-		if (Settings.Flags & FLAG_WINSIZE) SetWindowSize(Session->S->out_fd);
+		if (Settings.Flags & FLAG_WINSIZE) SetWindowSize(Session);
 		LastActivity=Now;
   }
 
@@ -436,24 +343,24 @@ while (1)
 	if ((Settings.IdleTimeout > 0) && ((Now - LastActivity) > Settings.IdleTimeout)) break;
 }
 
-if (StrLen(Settings.LogoutScript)) system(Settings.LogoutScript);
-if (Settings.Flags & FLAG_UNMOUNT) UndoBindMounts(Settings.BindMounts, 0);
+if (StrValid(Settings.LogoutScript)) system(Settings.LogoutScript);
 if (Settings.Flags & FLAG_DYNHOME) rmdir(Session->HomeDir);
 
 Duration=time(NULL) - Start;
 syslog(Settings.InfoLogLevel,"%s@%s logged out after %d secs",Session->User,Session->ClientIP, Duration);
 
 STREAMClose(Local);
-DestroyString(Tempstr);
+Destroy(Tempstr);
 }
 
 
 void GetClientHardwareAddress(TSession *Session)
 {
 STREAM *S;
-char *Tempstr=NULL, *Token=NULL, *ptr;
+char *Tempstr=NULL, *Token=NULL;
+const char *ptr;
 
-S=STREAMOpenFile("/proc/net/arp",O_RDONLY);
+S=STREAMOpen("/proc/net/arp","r");
 if (S)
 {
 	Tempstr=STREAMReadLine(Tempstr,S);
@@ -477,17 +384,18 @@ if (S)
 	STREAMClose(S);
 }
 
-DestroyString(Tempstr);
-DestroyString(Token);
+Destroy(Tempstr);
+Destroy(Token);
 }
 
 
 int FnmatchInList(char *List, char *Item)
 {
-char *Token=NULL, *ptr;
+char *Token=NULL;
+const char *ptr;
 int RetVal=FALSE;
 
-if (! StrLen(Item)) return(FALSE);
+if (! StrValid(Item)) return(FALSE);
 ptr=GetToken(List,",",&Token,0);
 while (ptr)
 {
@@ -499,7 +407,7 @@ while (ptr)
 	ptr=GetToken(ptr,",",&Token,0);
 }
 
-DestroyString(Token);
+Destroy(Token);
 return(RetVal);
 }
 
@@ -510,15 +418,15 @@ int CheckClientPermissions(TSession *Session)
 int RetVal=TRUE;
 
 
-if (StrLen(Settings.AllowIPs) || StrLen(Settings.AllowMACs)) RetVal=FALSE;
+if (StrValid(Settings.AllowIPs) || StrValid(Settings.AllowMACs)) RetVal=FALSE;
 
 
-if (StrLen(Settings.AllowIPs))
+if (StrValid(Settings.AllowIPs))
 {
 	if (FnmatchInList(Settings.AllowIPs, Session->ClientIP)) RetVal=TRUE;
 }
 
-if (StrLen(Settings.DenyIPs))
+if (StrValid(Settings.DenyIPs))
 {
 	if (FnmatchInList(Settings.DenyIPs, Session->ClientIP)) 
 	{
@@ -527,12 +435,12 @@ if (StrLen(Settings.DenyIPs))
 	}
 }
 
-if (StrLen(Settings.AllowMACs))
+if (StrValid(Settings.AllowMACs))
 {
 	if (FnmatchInList(Settings.AllowMACs, Session->ClientMAC)) RetVal=TRUE;
 }
 
-if (StrLen(Settings.DenyMACs))
+if (StrValid(Settings.DenyMACs))
 {
 	if (FnmatchInList(Settings.DenyMACs, Session->ClientMAC)) 
 	{
@@ -550,7 +458,8 @@ uid_t JailAndSwitchUser(int Flags, char *User, char *JailDir)
 struct passwd *pwent=NULL;
 uid_t UID=0;
 
-if (! StrLen(User)) pwent=getpwnam("nobody");
+return(0);
+if (! StrValid(User)) pwent=getpwnam("nobody");
 else pwent=getpwnam(User);
 
 chdir(JailDir);
@@ -561,7 +470,7 @@ if (pwent)
 {
 	UID=pwent->pw_uid;
 	if (setgid(pwent->pw_gid) !=0) exit(20);
-	if (setresuid(UID,UID,UID) !=0) exit(20);
+//	if (setresuid(UID,UID,UID) !=0) exit(20);
 }
 else exit(20);
 
@@ -572,34 +481,37 @@ return(UID);
 
 void HandleClient()
 {
-TSession *Session;
 char *Tempstr=NULL;
 int i;
 
 
 	Session=(TSession *) calloc(1,sizeof(TSession));
 	Session->Shell=CopyStr(Session->Shell,Settings.DefaultShell);
+	Session->TermType=CopyStr(Session->TermType,"vt100");
 	Session->S=STREAMFromDualFD(0,1);
+	STREAMSetItem(Session->S,"Session",Session);
 	STREAMSetTimeout(Session->S,0);
 	GetSockDetails(0, &Session->ServerIP, &i, &Session->ClientIP, &i);
 	GetClientHardwareAddress(Session);
 	Session->ClientHost=CopyStr(Session->ClientHost,IPStrToHostName(Session->ClientIP));
 
-	if (StrLen(Session->ClientMAC)) syslog(Settings.InfoLogLevel,"connection from: %s (%s / %s)", Session->ClientHost, Session->ClientIP, Session->ClientMAC);
+	if (StrValid(Session->ClientMAC)) syslog(Settings.InfoLogLevel,"connection from: %s (%s / %s)", Session->ClientHost, Session->ClientIP, Session->ClientMAC);
 	else syslog(Settings.InfoLogLevel,"connection from: %s (%s)", Session->ClientHost, Session->ClientIP);
 
 	if (! CheckClientPermissions(Session)) Session->Flags |= FLAG_DENYAUTH;
 
 	chdir(Settings.ChDir);
-	if (StrLen(Settings.ChDir)==0) chdir(Settings.ChDir);
+	if (StrValid(Settings.ChDir)==0) chdir(Settings.ChDir);
 	if (Settings.Flags & FLAG_CHROOT) chroot(".");
 
 	TelnetSendNegotiation(Session->S, TELNET_WONT, TELNET_LINEMODE);
 	TelnetSendNegotiation(Session->S, TELNET_WILL, TELNET_NOGOAHEAD);
 	//TelnetSendNegotiation(Session->S, TELNET_DONT, TELNET_LINEMODE);
 	TelnetSendNegotiation(Session->S, TELNET_WILL, TELNET_ECHO);
+	TelnetSendNegotiation(Session->S, TELNET_DO, TELNET_TERMTYPE);
+	TelnetSendNegotiation(Session->S, TELNET_DO, TELNET_WINSIZE);
 
-	if (StrLen(Settings.Banner)) 
+	if (StrValid(Settings.Banner)) 
 	{
 		Tempstr=SessionSubstituteVars(Tempstr,Settings.Banner,Session);
 		STREAMWriteLine(Tempstr,Session->S);
@@ -630,7 +542,7 @@ int i;
 	SessionClose(Session);
 	STREAMClose(Session->S);
 
-	DestroyString(Tempstr);
+	Destroy(Tempstr);
 	free(Session);
 	
 	_exit(0);
@@ -644,7 +556,7 @@ char *Tempstr=NULL;
 Tempstr=SessionSubstituteVars(Tempstr,Settings.PidFile,NULL);
 
 PidFile=WritePidFile(Tempstr);
-DestroyString(Tempstr);
+Destroy(Tempstr);
 }
 
 static void default_signal_handler(int sig) { /* do nothing */  }
@@ -655,7 +567,7 @@ int listensock, fd, i;
 struct sigaction sigact;
 char *Tempstr=NULL, *IPStr=NULL;
 
-listensock=InitServerSock(Settings.Interface,Settings.Port);
+listensock=IPServerInit(SOCK_STREAM, Settings.Interface, Settings.Port);
 if (listensock==-1)
 {
 	printf("ERROR: Cannot bind to port %d on interface %s\n",Settings.Port,Settings.Interface);
@@ -678,7 +590,7 @@ sigaction(SIGCHLD, &sigact, NULL);
 
 if (FDSelect(listensock, SELECT_READ, NULL)) 
 {
-	fd=TCPServerSockAccept(listensock, &IPStr);
+	fd=IPServerAccept(listensock, &IPStr);
 	if (fork()==0) 
 	{
 		//Sub processes shouldn't keep the pid file open, only the parent server
@@ -701,7 +613,7 @@ if (FDSelect(listensock, SELECT_READ, NULL))
 		strcpy(g_argv[0],Tempstr);
 
 		//In case logging demon was restarted, ensure we have connection before we chroot
-		openlog("ptelnetd",LOG_PID|LOG_NDELAY,LOG_DAEMON);
+		openlog(Settings.LogID,LOG_PID|LOG_NDELAY,LOG_DAEMON);
 		HandleClient();
 
 		//Should be redundant, but if something goes wrong in HandleClient, we might want this
@@ -722,12 +634,12 @@ main(int argc, char *argv[])
 g_argc=argc;
 g_argv=argv;
 
-//LOG_NDELAY to open connection immediately. That way we inherit the connection
-//when we chroot
-openlog("ptelnetd",LOG_PID|LOG_NDELAY,LOG_DAEMON);
-
 SettingsInit();
 SettingsParseCommandLine(argc, argv);
+
+//LOG_NDELAY to open connection immediately. That way we inherit the connection
+//when we chroot
+openlog(Settings.LogID,LOG_PID|LOG_NDELAY,LOG_DAEMON);
 
 //Check if settings are valid. Abort if the user has asked for something stupid and/or dangerous.
 if (! SettingsValid()) exit(2);

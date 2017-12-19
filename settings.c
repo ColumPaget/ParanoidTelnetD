@@ -1,9 +1,6 @@
 #include "settings.h"
-
-
-#define USER_ADD 1
-#define USER_DEL 2
-#define USER_LIST 3
+#include "Authenticate.h"
+#include <pwd.h>
 
 
 void PrintVersion()
@@ -25,7 +22,7 @@ printf("ParanoidTelnetD: version %s\n",VERSION);
 printf("Author: Colum Paget\n");
 printf("Email: colums.projects@gmail.com\n");
 printf("Blog: http://idratherhack.blogspot.com\n\n");
-printf("Credits: Sebastien Millet for patch to libUseful-2.0/pty.c that fixes segfaults on some systems\n");
+printf("Credits: Sebastien Millet for patch to libUseful-2.6/pty.c that fixes segfaults on some systems\n");
 
 printf("ptelnetd (Paranoid Telnet Daemon) is a telnet server intended to be used with embedded or commodity hardware that communicates over telnet. ptelnetd has its own authentication system, so that usernames/passwords can be used that are unique to ptelnetd, and cannot be used to log into the main system. When used with this 'native' authentication ptelnetd cannot log in users against accounts that are not listed in it's authentication file, thus limiting logins to those usernames/passwords set up for use with ptelnetd, and potentially only with ptelentd. Ptelnetd supports two types of chroot jail, blacklisting/whitelisting of users, ip-addresses and mac-addresses, and many other features intended to make the insecure telnet protocol as secure as possible.\n\n");
 printf("Usage: ptelnetd <options>\n");
@@ -76,7 +73,7 @@ printf("%-33s %s","-logout-script <path>","Script to run to clean up user's envi
 printf("%-33s %s","-m <dir list>","list of directories to 'bind mount' in user's home dir. See 'BIND MOUNTS' below\n");
 printf("%-33s %s","-mounts <dir list>","list of directories to 'bind mount' in user's home dir. See 'BIND MOUNTS' below\n");
 printf("%-33s %s","-honeypot","'Honeypot' mode. Fail to authenticate any user, even if they've got the right password, and log EVERYTHING as critical. See 'HONEYPOT MODE' below.\n");
-printf("%-33s %s","-user add [-a <auth file> <username> <password> [-encrypt <encryption type>] [-home <home directory>] [-shell <shell>]","'Add a user to the config file. -encrypt sets the type of encryption used to protect the stored password. Default is 'sha1', other options are 'plain', 'md5', 'sha256' and 'sha512'.\n");
+printf("%-33s %s","-user add [-a <auth file> <username> <password> [-encrypt <encryption type>] [-home <home directory>] [-shell <shell>] [-conf <conf>]","'Add a user to the config file. -encrypt sets the type of encryption used to protect the stored password. Default encryption is 'sha1', other options are 'plain', 'md5', 'sha256' and 'sha512'. '-conf' allows setting session config, see 'USER SESSION CONFIG' below\n");
 printf("%-33s %s","-user del [-a <auth file> <username>","'Delete a user from the config file.\n");
 printf("%-33s %s","-user list [-a <auth file>","List users in the config file.\n");
 
@@ -133,6 +130,22 @@ printf("	The -mounts <directories> command-line option supplies a comma-separate
 printf("\nLOGIN/LOGOUT SCRIPTS\n\n");
 printf("   The '-login-script' and '-logout-script' options allow scripts to be run on login/logout respectively. These scripts are run *outside* of the 'chhome' style of chroot, allowing the login script to copy things into the user's chroot-jail, then the user is chrooted into it, and when their session ends the logout script can import/copy files from the jail to the larger system.\n\n");
 
+printf("\nUSER SESSION CONFIG\n\n");
+printf("   When using 'native' authentication various configurations can be setup against a particular username/password combination. These can be set using the 'ptelnetd -user add -conf' method or, if brave, by editing the .auth file's last field. Configuration options are a space separated list of:\n\n");
+
+printf("chroot=<path>     chroot session into <path>\n");
+printf("ns=<path>       linux namespace to join. <path> is either a path to a namespace file, or a path to a directory (e.g. /proc/<pid>/ns ) that contains namespace descriptor files\n");
+printf("container       this uses linux namespaces and bind mounts (if supported). It creates a new directory, mounts read-only copies of /bin /lib /usr/lib in it, chroots into it, switches to a new namespace for network (which disallows all network access), IPC, processes, and uname values.\n");
+printf("+net            When used in combination with 'container' this allows the container to have normal network access, all other restrictions still apply\n");
+printf("nice=value      'nice' value of session\n");
+printf("prio=value       scheduling priority of session (equivalent to 0 - nice value)\n");
+printf("priority=value   scheduling priority of session (equivalent to 0 - nice value)\n");
+printf("mem=value        resource limit for memory (data segment) in session\n");
+printf("fsize=value      resource limit for filesize in session\n");
+printf("files=value      resource limit for open files in session\n");
+printf("coredumps=value  resource limit for max size of coredump files in session\n");
+printf("procs=value      resource limit for max number of processes ON A PER USER BASIS.\n");
+printf("\n");
 printf("\nHONEYPOT MODE\n\n");
 printf("	The '-honeypot' argument invokes a special mode in which Paranoid TelnetD will pretend to authenticate users, but will never accept any credentials as valid. It also logs everything as 'critical'. This provides a kind of poor-person's honeypot, as Paranoid TelnetD can be installed on systems that no-one should ever telnet into, and the logs watched for 'critical' error messages coming out of ptelnetd.\n");
 
@@ -166,11 +179,10 @@ Settings.IdleTimeout=3600;
 Settings.AuthMethods=CopyStr(Settings.AuthMethods,"native");
 Settings.AuthFile=CopyStr(Settings.AuthFile,"/etc/ptelnetd.auth");
 Settings.DefaultShell=CopyStr(Settings.DefaultShell,"/bin/sh");
-Settings.LogPath=CopyStr(Settings.LogPath,"/var/log/telnetd.log");
-Settings.BindMounts=CopyStr(Settings.BindMounts,"");
+Settings.LogID=CopyStr(Settings.LogID,"ptelnetd");
+Settings.ProcessConfig=CopyStr(Settings.ProcessConfig,"");
 Settings.PidFile=CopyStr(Settings.PidFile,"/var/run/ptelnetd-$(Interface)-$(ServerPort).pid");
 Settings.BlockHosts=ListCreate();
-Settings.TermType=CopyStr(Settings.TermType,"vt100");
 for (i=0; DefaultUsers[i] !=NULL; i++)
 {
 			if (getpwnam(DefaultUsers[i]))
@@ -187,17 +199,18 @@ Settings.ChDir=CopyStr(Settings.ChDir,"/var/empty/");
 void SettingsParseUserCommandLine(int argc, char *argv[])
 {
 int Type=0, i;
-char *User=NULL, *Pass=NULL, *HomeDir=NULL, *Path=NULL, *RealUser=NULL, *Shell=NULL, *Encrypt=NULL;
+char *User=NULL, *Pass=NULL, *HomeDir=NULL, *Path=NULL, *RealUser=NULL, *Shell=NULL, *Encrypt=NULL, *Conf=NULL;
 
 Path=CopyStr(Path,Settings.AuthFile);
 RealUser=CopyStr(RealUser,"nobody");
 HomeDir=CopyStr(HomeDir,"");
 Shell=CopyStr(Shell,"");
+Conf=CopyStr(Conf,"");
 Encrypt=CopyStr(Encrypt,"sha1");
 
-if (strcmp(argv[2],"add")==0) Type=USER_ADD;
-else if (strcmp(argv[2],"del")==0) Type=USER_DEL;
-else if (strcmp(argv[2],"list")==0) Type=USER_LIST;
+if (strcmp(argv[2],"add")==0) Type=NATIVEFILE_USER_ADD;
+else if (strcmp(argv[2],"del")==0) Type=NATIVEFILE_USER_DEL;
+else if (strcmp(argv[2],"list")==0) Type=NATIVEFILE_USER_LIST;
 else 
 {
 	printf("ERROR: 1st argument after '-user' must be 'add', 'del' or 'list'.\n");
@@ -213,6 +226,7 @@ for (i=3; i < argc; i++)
 	else if (strcmp(argv[i],"-encrypt")==0) Encrypt=CopyStr(Encrypt,argv[++i]);
 	else if (strcmp(argv[i],"-home")==0) HomeDir=CopyStr(HomeDir,argv[++i]);
 	else if (strcmp(argv[i],"-shell")==0) Shell=CopyStr(Shell,argv[++i]);
+	else if (strcmp(argv[i],"-conf")==0) Conf=CopyStr(Conf,argv[++i]);
 	else if (*argv[i] != '-')
 	{
 		if (! StrLen(User)) User=CopyStr(User,argv[i]);
@@ -220,7 +234,7 @@ for (i=3; i < argc; i++)
 	}
 }
 
-if (Type==USER_ADD)
+if (Type==NATIVEFILE_USER_ADD) 
 {
 	if (! StrLen(User)) 
 	{
@@ -233,20 +247,25 @@ if (Type==USER_ADD)
 		printf("ERROR: password missing\n");
 		exit(1);
 	}
-	UpdateNativeFile(Path, User, Encrypt, Pass, HomeDir, RealUser, Shell, "");
+	if (! UpdateNativeFile(Path, User, Encrypt, Pass, HomeDir, RealUser, Shell, Conf, Type))
+	{
+		printf("ERROR: Failed to open %s\n",Path);
+		exit(1);
+	}
 }
-else if (Type==USER_LIST)
+else if (Type==NATIVEFILE_USER_LIST)
 {
 	ListNativeFile(Path);
 }
 
-DestroyString(User);
-DestroyString(Pass);
-DestroyString(Path);
-DestroyString(Shell);
-DestroyString(Encrypt);
-DestroyString(HomeDir);
-DestroyString(RealUser);
+Destroy(User);
+Destroy(Pass);
+Destroy(Path);
+Destroy(Conf);
+Destroy(Shell);
+Destroy(Encrypt);
+Destroy(HomeDir);
+Destroy(RealUser);
 exit(0);
 }
 
@@ -296,13 +315,13 @@ for (i=1; i < argc; i++)
 	else if (strcmp("-debug", argv[i])==0) Settings.Flags |= FLAG_DEBUG;
 	else if (strcmp("-honeypot", argv[i])==0) 
 	{
-			Settings.Flags |= FLAG_DENYAUTH | FLAG_HONEYPOT;
+			Settings.Flags |= FLAG_DENYAUTH | FLAG_HONEYPOT | FLAG_LOGCREDS;
 			Settings.AuthMethods=CopyStr(Settings.AuthMethods,"");
 			Settings.AuthFile=CopyStr(Settings.AuthFile,"");
 			Settings.InfoLogLevel=LOG_CRIT;
 			Settings.ErrorLogLevel=LOG_CRIT;
 	}
-	else if (strcmp("-chhome", argv[i])==0) Settings.Flags |= FLAG_CHHOME;
+	else if (strcmp("-chhome", argv[i])==0) Settings.ProcessConfig=MCatStr(Settings.ProcessConfig,"chhome ",NULL);
 	else if (strcmp("-banner", argv[i])==0) Settings.Banner=CopyStr(Settings.Banner,argv[++i]);
 	else if (strcmp("-env", argv[i])==0) Settings.Environment=CopyStr(Settings.Environment,argv[++i]);
 	else if (strcmp("-a", argv[i])==0) Settings.AuthFile=CopyStr(Settings.AuthFile,argv[++i]);
@@ -321,8 +340,10 @@ for (i=1; i < argc; i++)
 	else if (strcmp("-allow-macs", argv[i])==0) Settings.AllowMACs=CopyStr(Settings.AllowMACs,argv[++i]);
 	else if (strcmp("-deny-macs", argv[i])==0) Settings.DenyMACs=CopyStr(Settings.DenyMACs,argv[++i]);
 	else if (strcmp("-local", argv[i])==0) Settings.Flags |= FLAG_LOCALONLY;
-	else if (strcmp("-m", argv[i])==0) Settings.BindMounts=CopyStr(Settings.BindMounts,argv[++i]);
-	else if (strcmp("-mounts", argv[i])==0) Settings.BindMounts=CopyStr(Settings.BindMounts,argv[++i]);
+	else if (strcmp("-m", argv[i])==0) Settings.ProcessConfig=MCatStr(Settings.ProcessConfig,"+mnt=",argv[++i]," ",NULL);
+	else if (strcmp("-mounts", argv[i])==0) Settings.ProcessConfig=MCatStr(Settings.ProcessConfig,"+mnt=",argv[++i]," ",NULL);
+	else if (strcmp("-wm", argv[i])==0) Settings.ProcessConfig=MCatStr(Settings.ProcessConfig,"+wmnt=",argv[++i]," ",NULL);
+	else if (strcmp("-wmounts", argv[i])==0) Settings.ProcessConfig=MCatStr(Settings.ProcessConfig,"+wmnt=",argv[++i]," ",NULL);
 	else if (strcmp("-i", argv[i])==0) Settings.Interface=CopyStr(Settings.Interface,argv[++i]);
 	else if (strcmp("-p", argv[i])==0) Settings.Port=atoi(argv[++i]);
 	else if (strcmp("-port", argv[i])==0) Settings.Port=atoi(argv[++i]);
@@ -337,6 +358,8 @@ for (i=1; i < argc; i++)
 	}
 	else if (strcmp("-error-log-level", argv[i])==0) Settings.ErrorLogLevel=SettingsParseLogLevel(argv[++i]);
 	else if (strcmp("-info-log-level", argv[i])==0) Settings.InfoLogLevel=SettingsParseLogLevel(argv[++i]);
+	else if (strcmp("-log-id", argv[i])==0) Settings.LogID=CopyStr(Settings.LogID, argv[++i]);
+	else if (strcmp("-log-creds", argv[i])==0) Settings.Flags |= FLAG_LOGCREDS;
 	else if (strcmp("-shell", argv[i])==0) Settings.DefaultShell=CopyStr(Settings.DefaultShell,argv[++i]);
 	else if (strcmp("-login-script", argv[i])==0) Settings.LoginScript=CopyStr(Settings.LoginScript,argv[++i]);
 	else if (strcmp("-logout-script", argv[i])==0) Settings.LogoutScript=CopyStr(Settings.LogoutScript,argv[++i]);
@@ -371,7 +394,8 @@ if (Settings.Flags & FLAG_ERROR)
 
 int SettingsValid()
 {
-char *Token=NULL, *ptr;
+char *Token=NULL;
+const char *ptr;
 
 if (! StrLen(Settings.RealUser))
 {
@@ -390,7 +414,7 @@ while (ptr)
 		printf("%s\n","ERROR: ParanoidTelnetD is too paranoid to allow 'open' authentication type without 'chroot' or 'chhome'. This would give free access to your entire system without a password. ParanoidTelnetd thinks that you are a little naieve.");
 		syslog(LOG_ERR,"%s\n","ERROR: ParanoidTelnetD is too paranoid to allow 'open' authentication type without 'chroot' or 'chhome'. This would give free access to your entire system without a password. ParanoidTelnetd thinks that you are a little naieve.");
 
-		DestroyString(Token);
+		Destroy(Token);
 		return(FALSE);
 		}
 	}
@@ -402,7 +426,7 @@ while (ptr)
 ptr=GetToken(ptr,",",&Token,0);
 }
 
-DestroyString(Token);
+Destroy(Token);
 return(TRUE);
 }
 
