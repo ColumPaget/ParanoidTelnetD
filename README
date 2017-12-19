@@ -163,7 +163,6 @@ USER SETTINGS
 
 chroot=<path>     chroot session into <path>
 
-
 ns=<path>       linux namespace to join. <path> is either a path to a namespace file, or a path to a directory (e.g. /proc/<pid>/ns ) that contains namespace descriptor files
 
 container       this uses linux containers (if supported). It creates a new directory, mounts read-only copies of /bin /lib /usr/lib in it, chroots into it, switches to a new namespace for network (which disallows all network access), IPC, processes, and uname values. 
@@ -180,7 +179,7 @@ files=value      resource limit for open files in session
 coredumps=value  resource limit for max size of coredump files in session
 procs=value      resource limit for max number of processes ON A PER USER BASIS.
 
-
+Please note: when using 'container' all your needed libraries must be in /lib or /usr/lib and you'll probably need an /etc/termcap file for the terminal to work correctly.
 	
 
 HONEYPOT MODE
