@@ -173,6 +173,7 @@ struct winsize w;
 
 if (Session->TermWidth && Session->TermHeight) 
 {
+		memset(&w, 0, sizeof(struct winsize));
 		w.ws_col=Session->TermWidth;
 		w.ws_row=Session->TermHeight;
     ioctl(Session->S->in_fd, TIOCSWINSZ, &w);
@@ -212,8 +213,8 @@ Destroy(Token);
 
 
 
-
-int LaunchPtyFunc(void *p_Session)
+//flags is not used by this function
+int LaunchPtyFunc(void *p_Session, int Flags)
 {
 char *Tempstr=NULL;
 int wid, len;
