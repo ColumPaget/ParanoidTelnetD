@@ -38,5 +38,5 @@ distclean:
 	-rm -fr autom4te.cache */autom4te.cache
 
 install:
-	@mkdir -p /usr/sbin
-	cp -f ptelnetd /usr/sbin
+	@mkdir -p $(DESTDIR)/$(prefix)/sbin
+	cp -f ptelnetd $(DESTDIR0/$(prefix)/sbin
