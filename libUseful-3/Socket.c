@@ -818,7 +818,6 @@ int GetSockDetails(int sock, char **LocalAddress, int *LocalPort, char **RemoteA
 
     //We've got the local sock, so lets still call it a success
     result=0;
-}
 
 if (result==0) return(TRUE);
 return(FALSE);

@@ -189,10 +189,13 @@ case '\b':
 case TELNET_BACKSPACE:
 	if (Flags & TNRB_NOPTY) 
 	{
-			len--;
-			tmpChr=inchar & 0xFF;
-			STREAMWriteBytes(S,&tmpChr,1);
-			STREAMFlush(S);
+			if (len > 0)
+			{
+				len--;
+				tmpChr=inchar & 0xFF;
+				STREAMWriteBytes(S,&tmpChr,1);
+				STREAMFlush(S);
+			}
 	}
 	else len=TelnetHandleChar(S, Data, len, inchar & 0xFF, NULL, Flags);
 break;
