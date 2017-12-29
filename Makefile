@@ -4,8 +4,9 @@ VERSION = 0.1
 CFLAGS = -g -O2
 LIBS = -lm -lcrypt -lpam 
 INSTALL=/bin/install -c
-prefix=/usr/local
+prefix=/tmp
 bindir=$(prefix)${exec_prefix}/bin
+mandir=$(prefix)/usr/share/man
 FLAGS=$(CFLAGS) -DPACKAGE_NAME=\"\" -DPACKAGE_TARNAME=\"\" -DPACKAGE_VERSION=\"\" -DPACKAGE_STRING=\"\" -DPACKAGE_BUGREPORT=\"\" -DPACKAGE_URL=\"\" -DSTDC_HEADERS=1 -DHAVE_LIBPAM=1 -DHAVE_LIBCRYPT=1 -DHAVE_LIBM=1 -DHAVE_SYS_TYPES_H=1 -DHAVE_SYS_STAT_H=1 -DHAVE_STDLIB_H=1 -DHAVE_STRING_H=1 -DHAVE_MEMORY_H=1 -DHAVE_STRINGS_H=1 -DHAVE_INTTYPES_H=1 -DHAVE_STDINT_H=1 -DHAVE_UNISTD_H=1 -DHAVE_SHADOW_H=1
 OBJ=Authenticate.o common.o telnet-protocol.o settings.o 
 EXE=ptelnetd
@@ -38,5 +39,8 @@ distclean:
 	-rm -fr autom4te.cache */autom4te.cache
 
 install:
-	@mkdir -p /usr/sbin
-	cp -f ptelnetd /usr/sbin
+	@mkdir -p $(DESTDIR)/$(prefix)/sbin
+	@mkdir -p $(DESTDIR)/$(mandir)/man.1
+	cp -f ptelnetd $(DESTDIR)/$(prefix)/sbin
+	cp -f ptelnetd.1 $(DESTDIR)/$(mandir)/man.1
+

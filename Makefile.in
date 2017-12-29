@@ -6,6 +6,7 @@ LIBS = @LIBS@
 INSTALL=@INSTALL@
 prefix=@prefix@
 bindir=$(prefix)@bindir@
+mandir=$(prefix)@mandir@
 FLAGS=$(CFLAGS) @DEFS@
 OBJ=Authenticate.o common.o telnet-protocol.o settings.o 
 EXE=ptelnetd
@@ -39,4 +40,7 @@ distclean:
 
 install:
 	@mkdir -p $(DESTDIR)/$(prefix)/sbin
-	cp -f ptelnetd $(DESTDIR0/$(prefix)/sbin
+	@mkdir -p $(DESTDIR)/$(mandir)/man.1
+	cp -f ptelnetd $(DESTDIR)/$(prefix)/sbin
+	cp -f ptelnetd.1 $(DESTDIR)/$(mandir)/man.1
+
