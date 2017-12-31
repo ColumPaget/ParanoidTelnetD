@@ -630,7 +630,7 @@ waitpid(-1,NULL,WNOHANG);
 
 
 
-main(int argc, char *argv[])
+int main(int argc, char *argv[])
 {
 g_argc=argc;
 g_argv=argv;
@@ -652,5 +652,7 @@ if (Settings.Flags & FLAG_INETD)
 	HandleClient();
 }
 else PTelnetDServerMode();
+
+return(0);
 }
 
