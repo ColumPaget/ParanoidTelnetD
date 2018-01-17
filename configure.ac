@@ -13,8 +13,10 @@ AC_PROG_MAKE_SET
 AC_PROG_INSTALL 
 AC_HEADER_STDC 
 
+AC_ARG_ENABLE(crypt, [  --enable-crypt		enable linux 'crypt' password support (default=autodetect) ], cf_use_crypt=$enableval )
 AC_ARG_ENABLE(pam, [  --enable-pam		enable Pluggable Authentication Modules (default=autodetect) ], cf_use_pam=$enableval )
-AC_ARG_ENABLE(lua, [  --enable-lua		enable Lua scripting (default=no) ], cf_use_lua=$enableval )
+AC_ARG_ENABLE(ip6, [  --enable-ip6		enable IPv6 (default=no) ], cf_use_ip6=$enableval )
+AC_ARG_ENABLE(ssl, [  --enable-ssl		enable SSL/TLS (default=no) ], cf_use_ssl=$enableval )
 
 if test "$cf_use_pam" != "no"
 then
@@ -22,20 +24,21 @@ AC_CHECK_LIB(pam, pam_start,,)
 cf_have_libpam=$ac_cv_lib_pam_pam_start
 fi
 
-AC_ARG_ENABLE(ip6, [  --enable-ip6		enable IPv6 (default=no) ], cf_use_ip6=$enableval )
+AC_CHECK_HEADER(crypt.h,cf_have_crypt_h="yes")
 
-
+if test "$cf_use_crypt" != "no" -a "$cf_have_crypt_h" = "yes"
+then
 AC_CHECK_LIB(crypt, crypt,,)
 cf_have_libcrypt=$ac_cv_lib_crypt_crypt
-
-
-if test "$cf_use_lua" = "yes"
-AC_CHECK_LIB(lua, lua_newstate,,)
-cf_have_liblua=$ac_cv_lib_lua_lua_newstate
-if test "$cf_have_liblua" = "yes"
-then
-AC_DEFINE([USE_LUA],[1]);
 fi
+
+if test "$cf_use_ssl" = "yes"
+then
+AC_CHECK_LIB(ssl,SSL_library_init,,)
+cf_have_libssl=$ac_cv_lib_ssl_SSL_library_init
+
+AC_CHECK_LIB(crypto,EVP_CIPHER_CTX_init,,)
+cf_have_libcrypto=$ac_cv_lib_crypto_EVP_CIPHER_CTX_init
 fi
 
 AC_CHECK_LIB(m,pow,,)

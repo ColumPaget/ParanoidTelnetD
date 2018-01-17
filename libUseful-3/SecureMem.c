@@ -69,6 +69,8 @@ int SecureLockMem(char *Mem, int Size, int Flags)
     if (Flags & SMEM_NOACCESS) mprotect(Mem, Size, PROT_NONE);
     else if (Flags & SMEM_WRONLY) mprotect(Mem, Size, PROT_WRITE);
     else if (Flags & SMEM_RDONLY) mprotect(Mem, Size, PROT_READ);
+
+    return(TRUE);
 }
 
 
@@ -289,13 +291,14 @@ int CredsStoreAdd(const char *Realm, const char *User, const char *Cred)
 // ten extra bytes is overkill, as there should be max 3 divisors and an
 // end of line character, but what they hey
     len=CredsStore->Size + StrLen(Realm) + StrLen(User) + StrLen(Cred) + 4;
-    CredsStore->Size=SecureRealloc(&(CredsStore->Data), CredsStore->Size, len, SMEM_NOFORK | SMEM_NODUMP | SMEM_LOCK);
-    SecureLockMem(CredsStore->Data, CredsStore->Size, SMEM_WRONLY);
+    SecureRealloc(&(CredsStore->Data), CredsStore->Size, len, SMEM_NOFORK | SMEM_NODUMP | SMEM_LOCK);
+    SecureLockMem(CredsStore->Data, len, SMEM_WRONLY);
     ptr=SecureStoreWriteField(CredsStore->Data+CredsStore->Size, Realm, CredsStore->Divisor);
     ptr=SecureStoreWriteField(ptr, User, CredsStore->Divisor);
     ptr=SecureStoreWriteField(ptr, Cred, CredsStore->Divisor);
     *ptr='\n';
-    SecureLockMem(CredsStore->Data, CredsStore->Size, SMEM_NOACCESS);
+    SecureLockMem(CredsStore->Data, len, SMEM_NOACCESS);
+    CredsStore->Size=len;
 
     return(TRUE);
 }

@@ -86,7 +86,7 @@ int DoSSLClientNegotiation(STREAM *S, int Flags);
 
 //if you receive a connection, say with IPServerAccept, then apply this function to it to activate SSL/TLS on the connection
 //'Flags' can be any of the LU_SSL_ flags listed above
-int DoSSLServerNegotiation(STREAM *S, int Flags);
+int DoSSLServerNegotiation(STREAM *S, const char *CertFile, const char *KeyFile, int Flags);
 
 
 #ifdef __cplusplus

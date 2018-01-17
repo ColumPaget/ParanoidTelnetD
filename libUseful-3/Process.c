@@ -288,26 +288,30 @@ void ProcessContainerInit(int tunfd, int linkfd, pid_t Child)
 }
 
 
-void JoinNamespace(const char *Namespace, int type)
+int JoinNamespace(const char *Namespace, int type)
 {
     char *Tempstr=NULL;
     struct stat Stat;
     glob_t Glob;
-    int i, fd;
+    int i, fd, result=FALSE;
 
+#ifdef HAVE_SETNS
     stat(Namespace,&Stat);
     if (S_ISDIR(Stat.st_mode))
     {
         Tempstr=MCopyStr(Tempstr,Namespace,"/*",NULL);
         glob(Tempstr,0,0,&Glob);
+        if (Glob.gl_pathc ==0) RaiseError(ERRFLAG_ERRNO, "namespaces", "namespace dir %s empty", Tempstr);
         for (i=0; i < Glob.gl_pathc; i++)
         {
             fd=open(Glob.gl_pathv[i],O_RDONLY);
             if (fd > -1)
             {
+                result=TRUE;
                 setns(fd, type);
                 close(fd);
             }
+            else RaiseError(ERRFLAG_ERRNO, "namespaces", "couldn't open namespace %s", Glob.gl_pathv[i]);
         }
     }
     else
@@ -315,12 +319,18 @@ void JoinNamespace(const char *Namespace, int type)
         fd=open(Namespace,O_RDONLY);
         if (fd > -1)
         {
+            result=TRUE;
             setns(fd, type);
             close(fd);
         }
+        else RaiseError(ERRFLAG_ERRNO, "namespaces", "couldn't open namespace %s", Namespace);
     }
+#else
+    RaiseError(0, "namespaces", "setns unavailable");
+#endif
 
     DestroyString(Tempstr);
+    return(result);
 }
 
 
@@ -344,10 +354,6 @@ void ProcessContainer(const char *Config)
         else if (strcasecmp(Name,"dir")==0) Dir=CopyStr(Dir, Value);
         else if (strcasecmp(Name,"ns")==0) Namespace=CopyStr(Namespace, Value);
         else if (strcasecmp(Name,"namespace")==0) Namespace=CopyStr(Namespace, Value);
-        else if (strcasecmp(Name,"container")==0) 
-				{
-					if (StrValid(Value)) Dir=CopyStr(Dir, Value);
-				}
         else if (strcasecmp(Name,"+net")==0) Flags |= PROC_CONTAINER_NET;
         else if (strcasecmp(Name,"+mnt")==0) ROMounts=MCatStr(ROMounts,",",Value,NULL);
         else if (strcasecmp(Name,"mnt")==0) ROMounts=CopyStr(ROMounts,Value);
@@ -357,6 +363,10 @@ void ProcessContainer(const char *Config)
         else if (strcasecmp(Name,"link")==0) Links=CopyStr(Links,Value);
         else if (strcasecmp(Name,"+plink")==0) PLinks=MCatStr(PLinks,",",Value,NULL);
         else if (strcasecmp(Name,"plink")==0) PLinks=CopyStr(PLinks,Value);
+        else if (strcasecmp(Name,"container")==0)
+        {
+            if (StrValid(Value)) Dir=CopyStr(Dir, Value);
+        }
 
         ptr=GetNameValuePair(ptr,"\\S","=",&Name,&Value);
     }
@@ -375,10 +385,7 @@ void ProcessContainer(const char *Config)
     {
 #ifdef CLONE_NEWNET
         if (StrValid(Namespace)) JoinNamespace(Namespace, CLONE_NEWNET);
-        else if (! (Flags & PROC_CONTAINER_NET)) 
-				{
-					unshare(CLONE_NEWNET);
-				}
+        else if (! (Flags & PROC_CONTAINER_NET)) unshare(CLONE_NEWNET);
 #endif
 
         //do these all individually because any one of them might be rejected
@@ -505,6 +512,7 @@ int ProcessApplyConfig(const char *Config)
         else if (strcasecmp(Name,"namespace")==0) Flags |= PROC_CONTAINER;
         else if (strcasecmp(Name,"trust")==0) Flags |= SPAWN_TRUST_COMMAND;
         else if (strcasecmp(Name,"noshell")==0) Flags |= SPAWN_NOSHELL;
+        else if (strcasecmp(Name,"arg0")==0) Flags |= SPAWN_ARG0;
         else if (strcasecmp(Name,"mem")==0)
         {
             val=(rlim_t) FromMetric(Value, 0);

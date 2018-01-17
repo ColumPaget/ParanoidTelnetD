@@ -345,7 +345,7 @@ AuthenticationsTried=MCatStr(AuthenticationsTried,AuthType," ",NULL);
 
 if (StrLen(Settings.AuthFile))
 {
-S=STREAMFileOpen(Settings.AuthFile,O_RDONLY);
+S=STREAMOpen(Settings.AuthFile,"r");
 if (! S) return(USER_UNKNOWN);
 
 Tempstr=STREAMReadLine(Tempstr,S);
@@ -410,7 +410,7 @@ STREAM *S;
 char *Tempstr=NULL, *Token=NULL, *SendStr=NULL;
 const char *ptr;
 
-S=STREAMFileOpen(Settings.AuthFile,O_RDONLY);
+S=STREAMOpen(Settings.AuthFile,"r");
 if (S)
 {
   Tempstr=STREAMReadLine(Tempstr,S);
@@ -480,7 +480,7 @@ int RetVal=FALSE;
 ListNode *Curr;
 
 Entries=ListCreate();
-S=STREAMFileOpen(Settings.AuthFile,O_RDONLY);
+S=STREAMOpen(Settings.AuthFile,"r");
 if (S)
 {
 	Tempstr=STREAMReadLine(Tempstr,S);
@@ -497,7 +497,7 @@ if (S)
 
 if (StrLen(Settings.AuthFile))
 {
-	S=STREAMFileOpen(Settings.AuthFile,O_WRONLY| O_CREAT | O_TRUNC);
+	S=STREAMOpen(Settings.AuthFile,"w");
 	if (S)
 	{
 	//First copy all other entries

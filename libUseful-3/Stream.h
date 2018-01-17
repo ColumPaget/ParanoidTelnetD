@@ -47,6 +47,27 @@ t     make a unique temporary file name. the file path must be a mktemp style te
 S     file contents are sorted
 z     compress/uncompress with gzip
 
+for 'http' and 'https' URLs the first argument is a haracter list (though only one character long) with the following values
+
+r    GET method (default if no method specified)
+w    POST method
+W    PUT method
+D    DELETE method
+P    PATCH method
+H    HEAD  method
+
+after this initial argument come name-value pairs with the following values
+
+oauth=<oauth config to use>
+content-type=<content type>
+content-length=<content length>
+user=<username>
+useragent=<user agent>
+user-agent=<user agent>
+hostauth
+
+Note, 'hostauth' is not a name/value pair, just a config flag that enables sending authentication without waiting for a 401 Response from the server. This means that we can't know the authentication realm for the server, and so internally use the hostname as the realm for looking up logon credentials. This is mostly useful for the github api.
+
 
 For 'cmd' type URLs the config options are those detailed in "SpawnPrograms.h"
 For 'tty' type URLs the config options are those detailed in "Pty.h" for "TTYConfigOpen"
@@ -94,7 +115,7 @@ typedef enum {STREAM_TYPE_FILE, STREAM_TYPE_PIPE, STREAM_TYPE_TTY, STREAM_TYPE_U
 #define SF_WRONLY 32       //open stream write only
 #define SF_CREAT 64        //create stream if it doesn't exist
 #define SF_CREATE 64       //create stream if it doesn't exist
-#define SF_APPEND 128      //append to file
+#define STREAM_APPEND 128      //append to file
 #define SF_TRUNC 256       //truncate file to zero bytes on open
 #define SF_MMAP  512       //create a memory mapped file
 #define SF_WRLOCK 1024     //lock file on every write
@@ -108,8 +129,8 @@ typedef enum {STREAM_TYPE_FILE, STREAM_TYPE_PIPE, STREAM_TYPE_TTY, STREAM_TYPE_U
 #define SF_SYMLINK_OK 262144    //don't raise a logging entry if opening a symlink
 #define SF_NOCACHE 524288       //don't cache file data in filesystem cache
 #define SF_SORTED  1048576      //file is sorted, this is a hint to 'STREAMFind'
-#define SF_IMMUTABLE  2097152   //file is immutable (if supported by fs)
-#define SF_APPENDONLY  4194304  //file is append-only (if supported by fs)
+#define STREAM_IMMUTABLE  2097152   //file is immutable (if supported by fs)
+#define STREAM_APPENDONLY  4194304  //file is append-only (if supported by fs)
 #define SF_COMPRESSED  8388608  //enable compression
 #define SF_TMPNAME  16777216    //file path is a template to create a temporary file name (must end in 'XXXXXX')
 
@@ -378,6 +399,12 @@ void STREAMReAllocBuffer(STREAM *S, int size, int Flags);
 //This function exists for a very obscure situation where you're using DataProcessors and need to add one, and restream data in the
 //stream buffers through it. Most users will never use this.
 void STREAMResetInputBuffers(STREAM *S);
+
+
+//This is used in communication types that require a 'commit' after a transaction. This differs from a 'flush' which just writes
+//data to the stream. Currently the only use of this is with HTTP POST, to declare that all uploaded data has been written and that
+//the server should process it and send a reply
+int STREAMCommit(STREAM *S);
 
 #ifdef __cplusplus
 }

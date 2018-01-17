@@ -13,20 +13,20 @@ EXE=ptelnetd
 
 all: $(OBJ) main.c
 	@cd libUseful-3; $(MAKE)
-	gcc -g -o$(EXE) $(OBJ) main.c libUseful-3/libUseful-3.a $(LIBS)
+	$(CC) -g -o$(EXE) $(OBJ) main.c libUseful-3/libUseful-3.a $(LIBS)
 
 
 Authenticate.o: Authenticate.c Authenticate.h
-	gcc $(FLAGS) -c Authenticate.c
+	$(CC) $(FLAGS) -c Authenticate.c
 
 settings.o: settings.c settings.h
-	gcc $(FLAGS) -c settings.c
+	$(CC) $(FLAGS) -c settings.c
 
 telnet-protocol.o: telnet-protocol.c telnet-protocol.h
-	gcc $(FLAGS) -c telnet-protocol.c
+	$(CC) $(FLAGS) -c telnet-protocol.c
 
 common.o: common.c common.h
-	gcc $(FLAGS) -c common.c
+	$(CC) $(FLAGS) -c common.c
 
 clean:
 	-rm -f *.o */*.o */*.a */*.so $(EXE)

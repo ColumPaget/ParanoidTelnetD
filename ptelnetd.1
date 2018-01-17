@@ -106,6 +106,12 @@ ptelnetd is a telnet server for the paranoid. It\'s intended to be used in those
 -local                            only allow login to \'local\' hosts (i.e. those hosts with an entry in the servers arp cache, and so on the same ethernet segment as the host
 .TP
 .B
+-tls-cert <path>                  path to tls/ssl certificate file. Setting this will enable TLS/SSL by default and also change the default port to 992
+.TP
+.B
+-tls-key  <path>                  path to tls/ssl key file. You must also supply a -tls-cert argument
+.TP
+.B
 -debug                            Extra logging for debugging
 .TP
 .B

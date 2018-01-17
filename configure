@@ -679,8 +679,10 @@ SHELL'
 ac_subst_files=''
 ac_user_opts='
 enable_option_checking
+enable_crypt
 enable_pam
 enable_ip6
+enable_ssl
 '
       ac_precious_vars='build_alias
 host_alias
@@ -1298,8 +1300,10 @@ Optional Features:
   --disable-option-checking  ignore unrecognized --enable/--with options
   --disable-FEATURE       do not include FEATURE (same as --enable-FEATURE=no)
   --enable-FEATURE[=ARG]  include FEATURE [ARG=yes]
+  --enable-crypt		enable linux 'crypt' password support (default=autodetect)
   --enable-pam		enable Pluggable Authentication Modules (default=autodetect)
   --enable-ip6		enable IPv6 (default=no)
+  --enable-ssl		enable SSL/TLS (default=no)
 
 Some influential environment variables:
   CC          C compiler command
@@ -3362,9 +3366,24 @@ $as_echo "#define STDC_HEADERS 1" >>confdefs.h
 fi
 
 
+# Check whether --enable-crypt was given.
+if test "${enable_crypt+set}" = set; then :
+  enableval=$enable_crypt; cf_use_crypt=$enableval
+fi
+
 # Check whether --enable-pam was given.
 if test "${enable_pam+set}" = set; then :
   enableval=$enable_pam; cf_use_pam=$enableval
+fi
+
+# Check whether --enable-ip6 was given.
+if test "${enable_ip6+set}" = set; then :
+  enableval=$enable_ip6; cf_use_ip6=$enableval
+fi
+
+# Check whether --enable-ssl was given.
+if test "${enable_ssl+set}" = set; then :
+  enableval=$enable_ssl; cf_use_ssl=$enableval
 fi
 
 
@@ -3418,13 +3437,32 @@ fi
 cf_have_libpam=$ac_cv_lib_pam_pam_start
 fi
 
-# Check whether --enable-ip6 was given.
-if test "${enable_ip6+set}" = set; then :
-  enableval=$enable_ip6; cf_use_ip6=$enableval
+# On IRIX 5.3, sys/types and inttypes.h are conflicting.
+for ac_header in sys/types.h sys/stat.h stdlib.h string.h memory.h strings.h \
+		  inttypes.h stdint.h unistd.h
+do :
+  as_ac_Header=`$as_echo "ac_cv_header_$ac_header" | $as_tr_sh`
+ac_fn_c_check_header_compile "$LINENO" "$ac_header" "$as_ac_Header" "$ac_includes_default
+"
+if eval test \"x\$"$as_ac_Header"\" = x"yes"; then :
+  cat >>confdefs.h <<_ACEOF
+#define `$as_echo "HAVE_$ac_header" | $as_tr_cpp` 1
+_ACEOF
+
+fi
+
+done
+
+
+ac_fn_c_check_header_mongrel "$LINENO" "crypt.h" "ac_cv_header_crypt_h" "$ac_includes_default"
+if test "x$ac_cv_header_crypt_h" = xyes; then :
+  cf_have_crypt_h="yes"
 fi
 
 
 
+if test "$cf_use_crypt" != "no" -a "$cf_have_crypt_h" = "yes"
+then
 { $as_echo "$as_me:${as_lineno-$LINENO}: checking for crypt in -lcrypt" >&5
 $as_echo_n "checking for crypt in -lcrypt... " >&6; }
 if ${ac_cv_lib_crypt_crypt+:} false; then :
@@ -3471,6 +3509,104 @@ _ACEOF
 fi
 
 cf_have_libcrypt=$ac_cv_lib_crypt_crypt
+fi
+
+if test "$cf_use_ssl" = "yes"
+then
+{ $as_echo "$as_me:${as_lineno-$LINENO}: checking for SSL_library_init in -lssl" >&5
+$as_echo_n "checking for SSL_library_init in -lssl... " >&6; }
+if ${ac_cv_lib_ssl_SSL_library_init+:} false; then :
+  $as_echo_n "(cached) " >&6
+else
+  ac_check_lib_save_LIBS=$LIBS
+LIBS="-lssl  $LIBS"
+cat confdefs.h - <<_ACEOF >conftest.$ac_ext
+/* end confdefs.h.  */
+
+/* Override any GCC internal prototype to avoid an error.
+   Use char because int might match the return type of a GCC
+   builtin and then its argument prototype would still apply.  */
+#ifdef __cplusplus
+extern "C"
+#endif
+char SSL_library_init ();
+int
+main ()
+{
+return SSL_library_init ();
+  ;
+  return 0;
+}
+_ACEOF
+if ac_fn_c_try_link "$LINENO"; then :
+  ac_cv_lib_ssl_SSL_library_init=yes
+else
+  ac_cv_lib_ssl_SSL_library_init=no
+fi
+rm -f core conftest.err conftest.$ac_objext \
+    conftest$ac_exeext conftest.$ac_ext
+LIBS=$ac_check_lib_save_LIBS
+fi
+{ $as_echo "$as_me:${as_lineno-$LINENO}: result: $ac_cv_lib_ssl_SSL_library_init" >&5
+$as_echo "$ac_cv_lib_ssl_SSL_library_init" >&6; }
+if test "x$ac_cv_lib_ssl_SSL_library_init" = xyes; then :
+  cat >>confdefs.h <<_ACEOF
+#define HAVE_LIBSSL 1
+_ACEOF
+
+  LIBS="-lssl $LIBS"
+
+fi
+
+cf_have_libssl=$ac_cv_lib_ssl_SSL_library_init
+
+{ $as_echo "$as_me:${as_lineno-$LINENO}: checking for EVP_CIPHER_CTX_init in -lcrypto" >&5
+$as_echo_n "checking for EVP_CIPHER_CTX_init in -lcrypto... " >&6; }
+if ${ac_cv_lib_crypto_EVP_CIPHER_CTX_init+:} false; then :
+  $as_echo_n "(cached) " >&6
+else
+  ac_check_lib_save_LIBS=$LIBS
+LIBS="-lcrypto  $LIBS"
+cat confdefs.h - <<_ACEOF >conftest.$ac_ext
+/* end confdefs.h.  */
+
+/* Override any GCC internal prototype to avoid an error.
+   Use char because int might match the return type of a GCC
+   builtin and then its argument prototype would still apply.  */
+#ifdef __cplusplus
+extern "C"
+#endif
+char EVP_CIPHER_CTX_init ();
+int
+main ()
+{
+return EVP_CIPHER_CTX_init ();
+  ;
+  return 0;
+}
+_ACEOF
+if ac_fn_c_try_link "$LINENO"; then :
+  ac_cv_lib_crypto_EVP_CIPHER_CTX_init=yes
+else
+  ac_cv_lib_crypto_EVP_CIPHER_CTX_init=no
+fi
+rm -f core conftest.err conftest.$ac_objext \
+    conftest$ac_exeext conftest.$ac_ext
+LIBS=$ac_check_lib_save_LIBS
+fi
+{ $as_echo "$as_me:${as_lineno-$LINENO}: result: $ac_cv_lib_crypto_EVP_CIPHER_CTX_init" >&5
+$as_echo "$ac_cv_lib_crypto_EVP_CIPHER_CTX_init" >&6; }
+if test "x$ac_cv_lib_crypto_EVP_CIPHER_CTX_init" = xyes; then :
+  cat >>confdefs.h <<_ACEOF
+#define HAVE_LIBCRYPTO 1
+_ACEOF
+
+  LIBS="-lcrypto $LIBS"
+
+fi
+
+cf_have_libcrypto=$ac_cv_lib_crypto_EVP_CIPHER_CTX_init
+fi
 
 { $as_echo "$as_me:${as_lineno-$LINENO}: checking for pow in -lm" >&5
 $as_echo_n "checking for pow in -lm... " >&6; }
@@ -3516,23 +3652,6 @@ _ACEOF
   LIBS="-lm $LIBS"
 
 fi
-
-
-# On IRIX 5.3, sys/types and inttypes.h are conflicting.
-for ac_header in sys/types.h sys/stat.h stdlib.h string.h memory.h strings.h \
-		  inttypes.h stdint.h unistd.h
-do :
-  as_ac_Header=`$as_echo "ac_cv_header_$ac_header" | $as_tr_sh`
-ac_fn_c_check_header_compile "$LINENO" "$ac_header" "$as_ac_Header" "$ac_includes_default
-"
-if eval test \"x\$"$as_ac_Header"\" = x"yes"; then :
-  cat >>confdefs.h <<_ACEOF
-#define `$as_echo "HAVE_$ac_header" | $as_tr_cpp` 1
-_ACEOF
-
-fi
-
-done
 
 
 ac_fn_c_check_header_mongrel "$LINENO" "shadow.h" "ac_cv_header_shadow_h" "$ac_includes_default"

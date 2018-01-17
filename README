@@ -11,7 +11,10 @@ DISCLAIMER:
 
 SYNOPSIS:
 
-ptelnetd (Paranoid Telnet Daemon) is a telnet server intended to be used with embedded or commodity hardware that communicates over telnet. ptelnetd has its own authentication system, so that usernames/passwords can be used that are unique to ptelnetd, and cannot be used to log into the main system. When used with this 'native' authentication ptelnetd cannot log in users against accounts that are not listed in it's authentication file, thus limiting logins to those usernames/passwords set up for use with ptelnetd, and potentially only with ptelentd. Ptelnetd supports two types of chroot jail, blacklisting/whitelisting of users, ip-addresses and mac-addresses, and many other features intended to make the insecure telnet protocol as secure as possible.
+ptelnetd (Paranoid Telnet Daemon) is a telnet server intended to be used with embedded or commodity hardware that communicates over telnet. ptelnetd has its own authentication system, so that usernames/passwords can be used that are unique to ptelnetd, and cannot be used to log into the main system. When used with this 'native' authentication ptelnetd cannot log in users against accounts that are not listed in it's authentication file, thus limiting logins to those usernames/passwords set up for use with ptelnetd, and potentially only with ptelentd. Ptelnetd supports two types of chroot jail; TLS/SSL encryption (port 992); blacklisting/whitelisting of users, ip-addresses and mac-addresses; and many other features intended to make the insecure telnet protocol as secure as possible.
+
+On linux ptelnetd can authenticate against any combination of it's own auth file, the shadow and password files, or Pluggable Authentication Modules (PAM).
+On freebsd ptelnetd has only been seen to work with it's own auth file (PAM may work, but has not yet been tested).
 
 
 USAGE: 
@@ -48,6 +51,8 @@ Options:
 -allow-macs <MAC addresses>       Comma separated list of ethernet MAC addresses allowed log in.
 -deny-macs <MAC addresses>        Comma separated list of ethernet MAC addresses denied log in.
 -local                            only allow login to 'local' hosts (i.e. those hosts with an entry in the servers arp cache, and so on the same ethernet segment as the host
+-tls-cert <path>                  path to tls/ssl certificate file. Setting this will enable TLS/SSL by default and also change the default port to 992
+-tls-key  <path>                  path to tls/ssl key file. You must also supply a -tls-cert argument
 -debug                            Extra logging for debugging
 -error-log-level <syslog level>   syslog level (debug,info,notice,warn,error,crit) to use for error logging
 -info-log-level <syslog level>    syslog level (debug,info,notice,warn,error,crit) to use for informational logging
@@ -198,6 +203,9 @@ IPv6
 
 	IPv6 support is disabled in the default build, but can be built in with 'configure --enable-ip6'. If you compile ptelnetd with IPv6, and then run ptelnetd without a specified interface, then both IPv4 and IPv6 will work. If you specify an interface then, if you specify it by interface name, or by an IPv4 address, only IPv4 will work, whereas if you specify and IPv6 address, only IPv6 will work.  Thus if you want to run both IPv4 and IPv6 on a specific interface, you'll have to launch two ptelnetd processes, one bound to the IPv4 address and one to the IPv6.
 
+TLS/SSL
+
+	TLS/SSL support is disabled in the default built, but can be built with 'configure --enable-ssl'. With SSL support enabled the command-line options -tls-cert and -tls-keyfile can be used to set the certificate and key file for tls, at which point the default port becomes 992 instead of 23 and the connection is encrypted by default.
 
 EXAMPLES
 

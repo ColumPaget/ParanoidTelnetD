@@ -500,6 +500,10 @@ int i;
 	else syslog(Settings.InfoLogLevel,"connection from: %s (%s)", Session->ClientHost, Session->ClientIP);
 
 	if (! CheckClientPermissions(Session)) Session->Flags |= FLAG_DENYAUTH;
+	if (StrValid(Settings.TLSCertificate) && StrValid(Settings.TLSKey))
+	{
+		DoSSLServerNegotiation(Session->S, Settings.TLSCertificate, Settings.TLSKey, 0);
+	}
 
 	chdir(Settings.ChDir);
 	if (StrValid(Settings.ChDir)==0) chdir(Settings.ChDir);
@@ -561,6 +565,8 @@ Destroy(Tempstr);
 }
 
 static void default_signal_handler(int sig) { /* do nothing */  }
+
+
 
 void PTelnetDServerMode()
 {
@@ -643,7 +649,7 @@ SettingsParseCommandLine(argc, argv);
 openlog(Settings.LogID,LOG_PID|LOG_NDELAY,LOG_DAEMON);
 
 //Check if settings are valid. Abort if the user has asked for something stupid and/or dangerous.
-if (! SettingsValid()) exit(2);
+if (! SettingsPostProcess()) exit(2);
 
 
 if (Settings.Flags & FLAG_INETD)

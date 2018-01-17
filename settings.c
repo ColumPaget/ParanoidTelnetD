@@ -57,6 +57,9 @@ printf("%-33s %s","-deny-ips <ip addresses>","Comma separated list of hosts deni
 printf("%-33s %s","-allow-macs <MAC addresses>","Comma separated list of ethernet MAC addresses allowed log in.\n");
 printf("%-33s %s","-deny-macs <MAC addresses>","Comma separated list of ethernet MAC addresses denied log in.\n");
 printf("%-33s %s","-local","only allow login to 'local' hosts (i.e. those hosts with an entry in the servers arp cache, and so on the same ethernet segment as the host\n");
+printf("%-33s %s","-tls-cert <path>","path to tls/ssl certificate file. Setting this will enable TLS/SSL by default and also change the default port to 992\n");
+printf("%-33s %s","-tls-key  <path>","path to tls/ssl key file. You must also supply a -tls-cert argument\n");
+printf("%-33s %s","-local","only allow login to 'local' hosts (i.e. those hosts with an entry in the servers arp cache, and so on the same ethernet segment as the host\n");
 printf("%-33s %s","-debug","Extra logging for debugging\n");
 printf("%-33s %s","-error-log-level <syslog level>","syslog level (debug,info,notice,warn,error,crit) to use for error logging\n");
 printf("%-33s %s","-info-log-level <syslog level>","syslog level (debug,info,notice,warn,error,crit) to use for informational logging\n");
@@ -172,7 +175,7 @@ int i;
 
 memset(&Settings,0,sizeof(TSettings));
 Settings.Interface=CopyStr(Settings.Interface,"");
-Settings.Port=23;
+Settings.Port=0;
 Settings.AuthDelay=3;
 Settings.AuthTries=3;
 Settings.IdleTimeout=3600;
@@ -340,6 +343,8 @@ for (i=1; i < argc; i++)
 	else if (strcmp("-allow-macs", argv[i])==0) Settings.AllowMACs=CopyStr(Settings.AllowMACs,argv[++i]);
 	else if (strcmp("-deny-macs", argv[i])==0) Settings.DenyMACs=CopyStr(Settings.DenyMACs,argv[++i]);
 	else if (strcmp("-local", argv[i])==0) Settings.Flags |= FLAG_LOCALONLY;
+	else if (strcmp("-tls-cert", argv[i])==0) Settings.TLSCertificate=CopyStr(Settings.TLSCertificate, argv[++i]);
+	else if (strcmp("-tls-key", argv[i])==0) Settings.TLSKey=CopyStr(Settings.TLSKey, argv[++i]);
 	else if (strcmp("-m", argv[i])==0) Settings.ProcessConfig=MCatStr(Settings.ProcessConfig,"+mnt=",argv[++i]," ",NULL);
 	else if (strcmp("-mounts", argv[i])==0) Settings.ProcessConfig=MCatStr(Settings.ProcessConfig,"+mnt=",argv[++i]," ",NULL);
 	else if (strcmp("-wm", argv[i])==0) Settings.ProcessConfig=MCatStr(Settings.ProcessConfig,"+wmnt=",argv[++i]," ",NULL);
@@ -392,10 +397,36 @@ if (Settings.Flags & FLAG_ERROR)
 
 
 
-int SettingsValid()
+int SettingsPostProcess()
 {
 char *Token=NULL;
 const char *ptr;
+
+if (Settings.Port==0)
+{
+if (StrValid(Settings.TLSCertificate)) Settings.Port=992;
+else Settings.Port=23;
+}
+
+if (StrValid(Settings.TLSCertificate))
+{
+
+if (! SSLAvailable())
+{
+  printf("%s\n","ERROR: TLS certificate set but SSL not compiled in.");
+  syslog(LOG_ERR,"%s","ERROR: TLS certificate set but SSL not compiled in.");
+  return(FALSE);
+}
+
+if (! StrValid(Settings.TLSKey))
+{
+  printf("%s\n","ERROR: TLS certificate set but no key file supplied (use -tls-key to supply one).");
+  syslog(LOG_ERR,"%s","ERROR: TLS certificate set but no key file supplied (use -tls-key to supply one).");
+  return(FALSE);
+}
+
+}
+
 
 if (! StrLen(Settings.RealUser))
 {

@@ -81,6 +81,8 @@ char *LoginScript;
 char *LogoutScript;
 char *PidFile;
 char *ProcessConfig;
+char *TLSCertificate;
+char *TLSKey;
 ListNode *BlockHosts;
 int Port;
 int AuthTries;

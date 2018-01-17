@@ -5,7 +5,7 @@
 #include "common.h"
 
 void SettingsInit();
-int SettingsValid();
+int SettingsPostProcess();
 void SettingsParseUserCommandLine(int argc, char *argv[]);
 void SettingsParseCommandLine(int argc, char *argv[]);
 

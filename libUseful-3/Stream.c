@@ -128,19 +128,19 @@ void STREAMSetFlags(STREAM *S, int Set, int UnSet)
     //immutable and append only flags are a special case as
     //they are not io flags, but permanent file flags so we
     //only touch those if explicitly set in Set or UnSet
-    if ((Set | UnSet) & (SF_IMMUTABLE | SF_APPENDONLY))
+    if ((Set | UnSet) & (STREAM_IMMUTABLE | STREAM_APPENDONLY))
     {
 #ifdef FS_IOC_SETFLAGS
         ioctl(S->out_fd, FS_IOC_GETFLAGS, &val);
 
 #ifdef FS_IMMUTABLE_FL
-        if (Set & SF_IMMUTABLE) val |= FS_IMMUTABLE_FL;
-        else if (UnSet & SF_IMMUTABLE) val &= ~FS_IMMUTABLE_FL;
+        if (Set & STREAM_IMMUTABLE) val |= FS_IMMUTABLE_FL;
+        else if (UnSet & STREAM_IMMUTABLE) val &= ~FS_IMMUTABLE_FL;
 #endif
 
 #ifdef FS_APPEND_FL
-        if (Set & SF_APPENDONLY) val |= FS_APPEND_FL;
-        else if (UnSet & SF_APPENDONLY) val |= FS_APPEND_FL;
+        if (Set & STREAM_APPENDONLY) val |= FS_APPEND_FL;
+        else if (UnSet & STREAM_APPENDONLY) val |= FS_APPEND_FL;
 #endif
 
         ioctl(S->out_fd, FS_IOC_SETFLAGS, &val);
@@ -617,7 +617,7 @@ STREAM *STREAMFileOpen(const char *Path, int Flags)
     else if (Flags & SF_RDONLY) Mode=O_RDONLY;
     else Mode=O_RDWR;
 
-    if (Flags & SF_APPEND) Mode|=O_APPEND;
+    if (Flags & STREAM_APPEND) Mode|=O_APPEND;
     if (Flags & SF_CREATE) Mode|=O_CREAT;
 
     if (strcmp(Path,"-")==0)
@@ -719,7 +719,7 @@ STREAM *STREAMFileOpen(const char *Path, int Flags)
             ftruncate(fd,0);
             STREAMSetValue(Stream, "FileSize", "0");
         }
-        if (Flags & SF_APPEND) lseek(fd,0,SEEK_END);
+        if (Flags & STREAM_APPEND) lseek(fd,0,SEEK_END);
     }
 
 
@@ -755,7 +755,7 @@ int STREAMParseConfig(const char *Config)
                 else Flags |= SF_WRONLY | SF_CREATE| SF_TRUNC;
                 break;
             case 'a':
-                Flags |= SF_APPEND | SF_CREATE;
+                Flags |= STREAM_APPEND | SF_CREATE;
                 break;
             case 'E':
                 Flags |= SF_ERROR;
@@ -776,10 +776,10 @@ int STREAMParseConfig(const char *Config)
                 Flags |= SF_EXEC_INHERIT;
                 break;
             case 'A':
-                Flags |= SF_APPENDONLY;
+                Flags |= STREAM_APPENDONLY;
                 break;
             case 'I':
-                Flags |= SF_IMMUTABLE;
+                Flags |= STREAM_IMMUTABLE;
                 break;
             case 'F':
                 Flags |= SF_FOLLOW;
@@ -839,18 +839,7 @@ STREAM *STREAMOpen(const char *URL, const char *Config)
         if (
             (strncmp(Proto,"http",5)==0)  ||
             (strncmp(Proto,"https",6)==0)
-        )
-        {
-            Token=MCopyStr(Token, URL, " ", Config, NULL);
-            if (Flags & SF_WRONLY)
-            {
-                S=HTTPMethod("POST", Token, "","", 0);
-            }
-            else
-            {
-                S=HTTPGet(Token);
-            }
-        }
+        ) S=HTTPWithConfig(URL, Config);
         //the 'write only' and 'read only' flags normally result in one or another
         //buffer not being allocated (as it's not expected to be needed). However
         //with HTTP 'write' means 'POST', and we still need both read and write
@@ -1008,6 +997,8 @@ void STREAMClose(STREAM *S)
             tmpS=(STREAM *) Curr->Item;
             STREAMClose(tmpS);
         }
+        else if (strcmp(Curr->Tag, "HTTP:InfoStruct")==0) HTTPInfoDestroy(Curr->Item);
+
         Curr=ListGetNext(Curr);
     }
 
@@ -2035,8 +2026,8 @@ unsigned long STREAMSendFile(STREAM *In, STREAM *Out, unsigned long Max, int Fla
             result=STREAMWriteBytes(Out,In->InputBuff+In->InStart,len);
             if (result==STREAM_CLOSED) return(STREAM_CLOSED);
 
-            In->InStart+=len;
-            bytes_transferred+=len;
+            In->InStart+=result;
+            bytes_transferred+=result;
         }
 
 
@@ -2066,3 +2057,15 @@ int STREAMCopy(STREAM *Src, const char *DestPath)
 }
 
 
+int STREAMCommit(STREAM *S)
+{
+    void *Item;
+
+    Item=STREAMGetItem(S, "HTTP:InfoStruct");
+    if (Item)
+    {
+        if (HTTPTransact((HTTPInfoStruct *) Item)) return(TRUE);
+    }
+
+    return(FALSE);
+}

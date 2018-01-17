@@ -345,7 +345,7 @@ void HTTPInfoSetValues(HTTPInfoStruct *Info, const char *Host, int Port, const c
     Info->PostContentLength=ContentLength;
     Info->UserName=CopyStr(Info->UserName, Logon);
 
-    if (StrLen(Password)) CredsStoreAdd(Host, Logon, Password);
+    if (StrValid(Password)) CredsStoreAdd(Host, Logon, Password);
 }
 
 
@@ -375,6 +375,8 @@ HTTPInfoStruct *HTTPInfoCreate(const char *Protocol, const char *Host, int Port,
         else if (strncmp(Info->Proxy,"https:",6)==0) Info->Flags |= HTTP_PROXY;
         else Info->Flags=HTTP_TUNNEL;
     }
+
+    Info->UserAgent=CopyStr(Info->UserAgent, LibUsefulGetValue("HTTP:UserAgent"));
 
     return(Info);
 }
@@ -407,7 +409,7 @@ void HTTPInfoPOSTSetContent(HTTPInfoStruct *Info, const char *ContentType, const
 
             Info->PostData=SetStrLen(Info->PostData,ContentLength);
             memcpy(Info->PostData, ContentData, ContentLength);
-        		Info->PostContentLength=StrLen(Info->PostData);
+            Info->PostContentLength=StrLen(Info->PostData);
         }
 
         if (StrValid(ContentType)) Info->PostContentType=CopyStr(Info->PostContentType,ContentType);
@@ -455,12 +457,17 @@ void HTTPInfoSetURL(HTTPInfoStruct *Info, const char *Method, const char *iURL)
             Info->AuthFlags |= HTTP_AUTH_OAUTH;
             Info->Credentials=CopyStr(Info->Credentials, Args);
         }
+        else if (strcasecmp(Token, "hostauth")==0) Info->AuthFlags |= HTTP_AUTH_HOST;
         else if (strcasecmp(Token, "content-type")==0)   Info->PostContentType=CopyStr(Info->PostContentType, Args);
         else if (strcasecmp(Token, "content-length")==0) Info->PostContentLength=atoi(Args);
         else if (strcasecmp(Token, "user")==0) Info->UserName=CopyStr(Info->UserName, Args);
+        else if (strcasecmp(Token, "useragent")==0) Info->UserAgent=CopyStr(Info->UserAgent, Args);
+        else if (strcasecmp(Token, "user-agent")==0) Info->UserAgent=CopyStr(Info->UserAgent, Args);
         else SetVar(Info->CustomSendHeaders, Token, Args);
         ptr=GetNameValuePair(ptr,"\\S","=",&Token, &Args);
     }
+
+    if (StrValid(Pass)) CredsStoreAdd(Info->Host, User, Pass);
 
     DestroyString(User);
     DestroyString(Pass);
@@ -796,6 +803,7 @@ char *HTTPHeadersAppendAuth(char *RetStr, char *AuthHeader, HTTPInfoStruct *Info
     ptr=GetToken(ptr,":",&Nonce,0);
 
     passlen=CredsStoreLookup(Realm, Info->UserName, &p_Password);
+
     if (! passlen) passlen=CredsStoreLookup(Info->Host, Info->UserName, &p_Password);
 
     if (Info->AuthFlags & (HTTP_AUTH_TOKEN | HTTP_AUTH_OAUTH)) SendStr=MCatStr(SendStr,AuthHeader,": ",AuthInfo,"\r\n",NULL);
@@ -873,6 +881,7 @@ void HTTPSendHeaders(STREAM *S, HTTPInfoStruct *Info)
         Info->Authorization=MCopyStr(Info->Authorization, "Bearer ", OAuthLookup(Info->Credentials, FALSE), NULL);
     }
     if (Info->Authorization) SendStr=HTTPHeadersAppendAuth(SendStr, "Authorization", Info, Info->Authorization);
+    else if (Info->AuthFlags & HTTP_AUTH_HOST) SendStr=HTTPHeadersAppendAuth(SendStr, "Authorization", Info, Info->Host);
     if (Info->ProxyAuthorization) SendStr=HTTPHeadersAppendAuth(SendStr, "Proxy-Authorization", Info, Info->ProxyAuthorization);
 
     if (Info->Flags & HTTP_NOCACHE) SendStr=CatStr(SendStr,"Pragma: no-cache\r\nCache-control: no-cache\r\n");
@@ -932,8 +941,7 @@ void HTTPSendHeaders(STREAM *S, HTTPInfoStruct *Info)
         SendStr=CatStr(SendStr,"Connection: close\r\n");
     }
 
-    ptr=LibUsefulGetValue("HTTP:UserAgent");
-    if (StrValid(ptr)) SendStr=MCatStr(SendStr,"User-Agent: ",ptr, "\r\n",NULL);
+    SendStr=MCatStr(SendStr,"User-Agent: ",Info->UserAgent, "\r\n",NULL);
 
     Curr=ListGetNext(Info->CustomSendHeaders);
     while (Curr)
@@ -1173,8 +1181,11 @@ STREAM *HTTPConnect(HTTPInfoStruct *Info)
 
     if (!S) S=HTTPSetupConnection(Info, FALSE);
 
-    if (S) S->Path=FormatStr(S->Path,"%s://%s:%d/%s",Info->Protocol,Info->Host,Info->Port,Info->Doc);
-
+    if (S)
+    {
+        S->Path=FormatStr(S->Path,"%s://%s:%d/%s",Info->Protocol,Info->Host,Info->Port,Info->Doc);
+        STREAMSetItem(S, "HTTP:InfoStruct", Info);
+    }
     return(S);
 }
 
@@ -1263,6 +1274,9 @@ STREAM *HTTPTransact(HTTPInfoStruct *Info)
                 (StrEnd(Info->ProxyAuthorization))
             ) break;
 
+
+            //must do this or STREAMClose destroys Info object!
+            STREAMSetItem(Info->S, "HTTP:InfoStruct", NULL);
             STREAMClose(Info->S);
             Info->S=NULL;
         }
@@ -1283,8 +1297,6 @@ STREAM *HTTPMethod(const char *Method, const char *URL, const char *ContentType,
     Info=HTTPInfoFromURL(Method, URL);
     HTTPInfoPOSTSetContent(Info, ContentType, ContentData, ContentLength, HTTP_POSTARGS);
     S=HTTPTransact(Info);
-
-    HTTPInfoDestroy(Info);
     return(S);
 }
 
@@ -1299,6 +1311,41 @@ STREAM *HTTPPost(const char *URL, const char *ContentType, const char *Content)
 {
     return(HTTPMethod("POST", URL, ContentType, Content, StrLen(Content)));
 }
+
+
+STREAM *HTTPWithConfig(const char *URL, const char *Config)
+{
+    char *Token=NULL;
+    const char *ptr, *cptr, *p_Method="GET";
+    STREAM *S;
+    int Flags=0;
+
+
+    ptr=GetToken(Config,"\\S",&Token, 0);
+
+//if the first arg contains '=' then they've forgotten to supply a method specifier, so go with 'GET' and
+//treat all the args as name=value pairs that are dealt with in HTTPInfoSetURL
+    if (strchr(Token,'=')) ptr=Config;
+    else
+    {
+        for (cptr=Token; *cptr !='\0'; cptr++)
+        {
+            if (*cptr=='w') p_Method="POST";
+            else if (*cptr=='W') p_Method="PUT";
+            else if (*cptr=='P') p_Method="PATCH";
+            else if (*cptr=='D') p_Method="DELETE";
+            else if (*cptr=='H') p_Method="HEAD";
+        }
+    }
+
+    Token=MCopyStr(Token, URL, " ", ptr, NULL);
+    S=HTTPMethod(p_Method, Token, "","", 0);
+
+    DestroyString(Token);
+
+    return(S);
+}
+
 
 
 int HTTPCopyToSTREAM(STREAM *Con, STREAM *S)
