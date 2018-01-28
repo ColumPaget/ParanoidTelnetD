@@ -3,7 +3,7 @@
 
 #include "libUseful-3/libUseful.h"
 
-#define VERSION "3.0"
+#define VERSION "4.0"
 
 #define ERR_OKAY 0
 #define ERR_FILE 1
@@ -31,7 +31,8 @@
 #define FLAG_FORCE_SHELL 2048
 #define FLAG_HONEYPOT 4096
 #define FLAG_LOGCREDS 8192
-#define FLAG_CHALLENGE 16384
+#define FLAG_CHALLENGE  16384
+#define FLAG_NONROOT 32768
 #define FLAG_ERROR 134217728
 
 

@@ -225,7 +225,11 @@ Session->S=STREAMFromDualFD(0,1);
 
 SetupEnvironment(Session);
 
-Tempstr=MCopyStr(Tempstr,"user=",Session->RealUser," ", Settings.ProcessConfig," ",Session->ProcessConfig,NULL);
+if (getuid()==0)
+{
+Tempstr=MCopyStr(Tempstr,"user=",Session->RealUser," ", NULL);
+}
+Tempstr=MCatStr(Tempstr, Settings.ProcessConfig," ",Session->ProcessConfig,NULL);
 
 ProcessApplyConfig(Tempstr);
 Destroy(Tempstr);
@@ -459,7 +463,6 @@ uid_t JailAndSwitchUser(int Flags, char *User, char *JailDir)
 struct passwd *pwent=NULL;
 uid_t UID=0;
 
-return(0);
 if (! StrValid(User)) pwent=getpwnam("nobody");
 else pwent=getpwnam(User);
 

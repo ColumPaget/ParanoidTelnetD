@@ -106,6 +106,9 @@ ptelnetd is a telnet server for the paranoid. It\'s intended to be used in those
 -local                            only allow login to \'local\' hosts (i.e. those hosts with an entry in the servers arp cache, and so on the same ethernet segment as the host
 .TP
 .B
+-non-root                         run server as a user other than root. 'Port' must be set to greater than 1024 and the authentication file must be readable by the current user. Virtual users will run as the current user within the default directory (/var/empty) unless they have home directories specified in the authentication file.
+.TP
+.B
 -tls-cert <path>                  path to tls/ssl certificate file. Setting this will enable TLS/SSL by default and also change the default port to 992
 .TP
 .B

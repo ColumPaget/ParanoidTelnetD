@@ -60,6 +60,7 @@ printf("%-33s %s","-local","only allow login to 'local' hosts (i.e. those hosts 
 printf("%-33s %s","-tls-cert <path>","path to tls/ssl certificate file. Setting this will enable TLS/SSL by default and also change the default port to 992\n");
 printf("%-33s %s","-tls-key  <path>","path to tls/ssl key file. You must also supply a -tls-cert argument\n");
 printf("%-33s %s","-local","only allow login to 'local' hosts (i.e. those hosts with an entry in the servers arp cache, and so on the same ethernet segment as the host\n");
+printf("%-33s %s","-non-root","run server as a user other than root. 'Port' must be set to greater than 1024 and the authentication file must be readable by the current user. Virtual users will run as the current user within the default directory (/var/empty) unless they have home directories specified in the authentication file.\n");
 printf("%-33s %s","-debug","Extra logging for debugging\n");
 printf("%-33s %s","-error-log-level <syslog level>","syslog level (debug,info,notice,warn,error,crit) to use for error logging\n");
 printf("%-33s %s","-info-log-level <syslog level>","syslog level (debug,info,notice,warn,error,crit) to use for informational logging\n");
@@ -368,6 +369,7 @@ for (i=1; i < argc; i++)
 	else if (strcmp("-shell", argv[i])==0) Settings.DefaultShell=CopyStr(Settings.DefaultShell,argv[++i]);
 	else if (strcmp("-login-script", argv[i])==0) Settings.LoginScript=CopyStr(Settings.LoginScript,argv[++i]);
 	else if (strcmp("-logout-script", argv[i])==0) Settings.LogoutScript=CopyStr(Settings.LogoutScript,argv[++i]);
+	else if (strcmp("-non-root", argv[i])==0) Settings.Flags |= FLAG_NONROOT;
 	else if (strcmp("-real-user", argv[i])==0) 
 	{
 		i++;
@@ -407,6 +409,22 @@ if (Settings.Port==0)
 if (StrValid(Settings.TLSCertificate)) Settings.Port=992;
 else Settings.Port=23;
 }
+
+if ((getuid() != 0) && (! (Settings.Flags & FLAG_NONROOT)))
+{
+  printf("%s\n","ERROR: Not run as root, but '-non-root' flag not set. If you want to run everything as the current user, please supply '-non-root' on the command-line.");
+  syslog(LOG_ERR, "%s","ERROR: Not run as root, but '-non-root' flag not set. If you want to run everything as the current user, please supply '-non-root' on the command-line.");
+  return(FALSE);
+}
+
+if ((getuid() != 0) && (Settings.Flags & FLAG_NONROOT) && (Settings.Port < 1025))
+{
+  printf("%s\n","ERROR: in '-non-root' mode you must specify a port higher than port 1024, as the O.S. only allows root to bind to low ports.");
+  syslog(LOG_ERR,"%s","ERROR: in '-non-root' mode you must specify a port higher than port 1024, as the O.S. only allows root to bind to low ports.");
+  return(FALSE);
+}
+
+
 
 if (StrValid(Settings.TLSCertificate))
 {

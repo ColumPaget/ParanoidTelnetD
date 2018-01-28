@@ -51,6 +51,7 @@ Options:
 -allow-macs <MAC addresses>       Comma separated list of ethernet MAC addresses allowed log in.
 -deny-macs <MAC addresses>        Comma separated list of ethernet MAC addresses denied log in.
 -local                            only allow login to 'local' hosts (i.e. those hosts with an entry in the servers arp cache, and so on the same ethernet segment as the host
+-non-root                         run server as a user other than root. 'Port' must be set to greater than 1024 and the authentication file must be readable by the current user. Virtual users will run as the current user within the default directory (/var/empty) unless they have home directories specified in the authentication file.
 -tls-cert <path>                  path to tls/ssl certificate file. Setting this will enable TLS/SSL by default and also change the default port to 992
 -tls-key  <path>                  path to tls/ssl key file. You must also supply a -tls-cert argument
 -debug                            Extra logging for debugging

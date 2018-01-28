@@ -410,7 +410,7 @@ STREAM *S;
 char *Tempstr=NULL, *Token=NULL, *SendStr=NULL;
 const char *ptr;
 
-S=STREAMOpen(Settings.AuthFile,"r");
+S=STREAMOpen(Path,"r");
 if (S)
 {
   Tempstr=STREAMReadLine(Tempstr,S);
@@ -480,7 +480,7 @@ int RetVal=FALSE;
 ListNode *Curr;
 
 Entries=ListCreate();
-S=STREAMOpen(Settings.AuthFile,"r");
+S=STREAMOpen(Path,"r");
 if (S)
 {
 	Tempstr=STREAMReadLine(Tempstr,S);
@@ -495,9 +495,9 @@ if (S)
 }
 
 
-if (StrLen(Settings.AuthFile))
+if (StrLen(Path))
 {
-	S=STREAMOpen(Settings.AuthFile,"w");
+	S=STREAMOpen(Path,"w");
 	if (S)
 	{
 	//First copy all other entries
@@ -530,7 +530,8 @@ if (StrLen(Settings.AuthFile))
 
 		STREAMWriteLine(Tempstr,S);
 
-		SwitchUser(RealUser);
+	
+		if (getuid()==0) SwitchUser(RealUser);
 		mkdir(HomeDir,0770);
 	}
 
