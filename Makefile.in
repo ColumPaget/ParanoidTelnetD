@@ -12,8 +12,8 @@ OBJ=Authenticate.o common.o telnet-protocol.o settings.o
 EXE=ptelnetd
 
 all: $(OBJ) main.c
-	@cd libUseful-3; $(MAKE)
-	$(CC) -g -o$(EXE) $(OBJ) main.c libUseful-3/libUseful-3.a $(LIBS)
+	@cd libUseful; $(MAKE)
+	$(CC) -g -o$(EXE) $(OBJ) main.c libUseful/libUseful.a $(LIBS)
 
 
 Authenticate.o: Authenticate.c Authenticate.h

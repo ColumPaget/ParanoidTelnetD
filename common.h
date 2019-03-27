@@ -1,7 +1,7 @@
 #ifndef PARANOID_TELNETD_H
 #define PARANOID_TELNETD_H
 
-#include "libUseful-3/libUseful.h"
+#include "libUseful/libUseful.h"
 
 #define VERSION "4.0"
 

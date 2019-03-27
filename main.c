@@ -505,7 +505,10 @@ int i;
 	if (! CheckClientPermissions(Session)) Session->Flags |= FLAG_DENYAUTH;
 	if (StrValid(Settings.TLSCertificate) && StrValid(Settings.TLSKey))
 	{
-		DoSSLServerNegotiation(Session->S, Settings.TLSCertificate, Settings.TLSKey, 0);
+		STREAMSetValue(Session->S, "SSL:CertFile", Settings.TLSCertificate);
+		STREAMSetValue(Session->S, "SSL:KeyFile", Settings.TLSKey);
+		
+		DoSSLServerNegotiation(Session->S, 0);
 	}
 
 	chdir(Settings.ChDir);
