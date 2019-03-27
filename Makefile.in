@@ -3,6 +3,7 @@ CC = @CC@
 VERSION = @VERSION@
 CFLAGS = @CFLAGS@
 LIBS = @LIBS@
+STATIC_LIBS=@LIBUSEFUL_BUNDLED@
 INSTALL=@INSTALL@
 prefix=@prefix@
 sbindir=@sbindir@
@@ -11,10 +12,11 @@ FLAGS=$(CFLAGS) @DEFS@
 OBJ=Authenticate.o common.o telnet-protocol.o settings.o 
 EXE=ptelnetd
 
-all: $(OBJ) main.c
-	@cd libUseful; $(MAKE)
-	$(CC) -g -o$(EXE) $(OBJ) main.c libUseful/libUseful.a $(LIBS)
+all: $(OBJ) $(STATIC_LIBS) main.c
+	$(CC) -g -o$(EXE) $(OBJ) main.c $(STATIC_LIBS) $(LIBS)
 
+libUseful/libUseful.a:
+	$(MAKE) -C libUseful
 
 Authenticate.o: Authenticate.c Authenticate.h
 	$(CC) $(FLAGS) -c Authenticate.c

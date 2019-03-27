@@ -3,7 +3,7 @@
 
 #include "libUseful/libUseful.h"
 
-#define VERSION "4.0"
+#define VERSION "4.1"
 
 #define ERR_OKAY 0
 #define ERR_FILE 1

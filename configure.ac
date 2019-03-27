@@ -2,10 +2,8 @@
 
 AC_INIT([main.c])
 
-VERSION="0.1" 
 AC_SUBST(VERSION) 
 
-AC_CONFIG_SUBDIRS([libUseful])
 
 AC_PROG_CC 
 AC_LANG_C 
@@ -17,6 +15,26 @@ AC_ARG_ENABLE(crypt, [  --enable-crypt		enable linux 'crypt' password support (d
 AC_ARG_ENABLE(pam, [  --enable-pam		enable Pluggable Authentication Modules (default=autodetect) ], cf_use_pam=$enableval )
 AC_ARG_ENABLE(ip6, [  --enable-ip6		enable IPv6 (default=no) ], cf_use_ip6=$enableval )
 AC_ARG_ENABLE(ssl, [  --enable-ssl		enable SSL/TLS (default=no) ], cf_use_ssl=$enableval )
+
+
+AC_ARG_WITH(libuseful, [  --with-libuseful		use system-wide libUseful (default=auto) ], cf_system_libuseful=$withval )
+
+if test "$cf_system_libuseful" != "no"
+then
+AC_CHECK_LIB(Useful,GetToken,[cf_have_libUseful=yes],[cf_have_libUseful=no])
+fi
+
+if test "$cf_have_libUseful" = "yes"
+then
+  echo "installed libUseful found, using that instead of bundled libUseful."
+  echo "if you want to use bundled libUseful, force it with --with-libuseful=no"
+  AC_SUBST(LIBUSEFUL_BUNDLED,"")
+  dnl Default behavior of AC_CHECK_LIB is to add the library to the LIBS variable
+  AC_CHECK_LIB(Useful,GetToken,,)
+else
+  AC_SUBST(LIBUSEFUL_BUNDLED,"libUseful/libUseful.a")
+  AC_CONFIG_SUBDIRS([libUseful])
+fi
 
 if test "$cf_use_pam" != "no"
 then
@@ -80,3 +98,9 @@ echo "IPv6 enabled"
 fi
 
 
+if test "$cf_have_libUseful" = "yes"
+then
+echo "Using system-wide libUseful"
+else
+echo "Using bundled libUseful"
+fi

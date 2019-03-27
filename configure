@@ -622,6 +622,8 @@ ac_includes_default="\
 
 ac_subst_vars='LTLIBOBJS
 LIBOBJS
+subdirs
+LIBUSEFUL_BUNDLED
 EGREP
 GREP
 CPP
@@ -636,7 +638,6 @@ CPPFLAGS
 LDFLAGS
 CFLAGS
 CC
-subdirs
 VERSION
 target_alias
 host_alias
@@ -683,6 +684,7 @@ enable_crypt
 enable_pam
 enable_ip6
 enable_ssl
+with_libuseful
 '
       ac_precious_vars='build_alias
 host_alias
@@ -1304,6 +1306,11 @@ Optional Features:
   --enable-pam		enable Pluggable Authentication Modules (default=autodetect)
   --enable-ip6		enable IPv6 (default=no)
   --enable-ssl		enable SSL/TLS (default=no)
+
+Optional Packages:
+  --with-PACKAGE[=ARG]    use PACKAGE [ARG=yes]
+  --without-PACKAGE       do not use PACKAGE (same as --with-PACKAGE=no)
+  --with-libuseful		use system-wide libUseful (default=auto)
 
 Some influential environment variables:
   CC          C compiler command
@@ -2028,41 +2035,7 @@ ac_compiler_gnu=$ac_cv_c_compiler_gnu
 
 
 
-VERSION="0.1"
 
-
-ac_aux_dir=
-for ac_dir in "$srcdir" "$srcdir/.." "$srcdir/../.."; do
-  if test -f "$ac_dir/install-sh"; then
-    ac_aux_dir=$ac_dir
-    ac_install_sh="$ac_aux_dir/install-sh -c"
-    break
-  elif test -f "$ac_dir/install.sh"; then
-    ac_aux_dir=$ac_dir
-    ac_install_sh="$ac_aux_dir/install.sh -c"
-    break
-  elif test -f "$ac_dir/shtool"; then
-    ac_aux_dir=$ac_dir
-    ac_install_sh="$ac_aux_dir/shtool install -c"
-    break
-  fi
-done
-if test -z "$ac_aux_dir"; then
-  as_fn_error $? "cannot find install-sh, install.sh, or shtool in \"$srcdir\" \"$srcdir/..\" \"$srcdir/../..\"" "$LINENO" 5
-fi
-
-# These three variables are undocumented and unsupported,
-# and are intended to be withdrawn in a future Autoconf release.
-# They can cause serious problems if a builder's source tree is in a directory
-# whose full name contains unusual characters.
-ac_config_guess="$SHELL $ac_aux_dir/config.guess"  # Please don't use this var.
-ac_config_sub="$SHELL $ac_aux_dir/config.sub"  # Please don't use this var.
-ac_configure="$SHELL $ac_aux_dir/configure"  # Please don't use this var.
-
-
-
-
-subdirs="$subdirs libUseful"
 
 
 ac_ext=c
@@ -2891,6 +2864,35 @@ $as_echo "no" >&6; }
   SET_MAKE="MAKE=${MAKE-make}"
 fi
 
+ac_aux_dir=
+for ac_dir in "$srcdir" "$srcdir/.." "$srcdir/../.."; do
+  if test -f "$ac_dir/install-sh"; then
+    ac_aux_dir=$ac_dir
+    ac_install_sh="$ac_aux_dir/install-sh -c"
+    break
+  elif test -f "$ac_dir/install.sh"; then
+    ac_aux_dir=$ac_dir
+    ac_install_sh="$ac_aux_dir/install.sh -c"
+    break
+  elif test -f "$ac_dir/shtool"; then
+    ac_aux_dir=$ac_dir
+    ac_install_sh="$ac_aux_dir/shtool install -c"
+    break
+  fi
+done
+if test -z "$ac_aux_dir"; then
+  as_fn_error $? "cannot find install-sh, install.sh, or shtool in \"$srcdir\" \"$srcdir/..\" \"$srcdir/../..\"" "$LINENO" 5
+fi
+
+# These three variables are undocumented and unsupported,
+# and are intended to be withdrawn in a future Autoconf release.
+# They can cause serious problems if a builder's source tree is in a directory
+# whose full name contains unusual characters.
+ac_config_guess="$SHELL $ac_aux_dir/config.guess"  # Please don't use this var.
+ac_config_sub="$SHELL $ac_aux_dir/config.sub"  # Please don't use this var.
+ac_configure="$SHELL $ac_aux_dir/configure"  # Please don't use this var.
+
+
 # Find a good install program.  We prefer a C program (faster),
 # so one script is as good as another.  But avoid the broken or
 # incompatible versions:
@@ -3386,6 +3388,120 @@ if test "${enable_ssl+set}" = set; then :
   enableval=$enable_ssl; cf_use_ssl=$enableval
 fi
 
+
+
+
+# Check whether --with-libuseful was given.
+if test "${with_libuseful+set}" = set; then :
+  withval=$with_libuseful; cf_system_libuseful=$withval
+fi
+
+
+if test "$cf_system_libuseful" != "no"
+then
+{ $as_echo "$as_me:${as_lineno-$LINENO}: checking for GetToken in -lUseful" >&5
+$as_echo_n "checking for GetToken in -lUseful... " >&6; }
+if ${ac_cv_lib_Useful_GetToken+:} false; then :
+  $as_echo_n "(cached) " >&6
+else
+  ac_check_lib_save_LIBS=$LIBS
+LIBS="-lUseful  $LIBS"
+cat confdefs.h - <<_ACEOF >conftest.$ac_ext
+/* end confdefs.h.  */
+
+/* Override any GCC internal prototype to avoid an error.
+   Use char because int might match the return type of a GCC
+   builtin and then its argument prototype would still apply.  */
+#ifdef __cplusplus
+extern "C"
+#endif
+char GetToken ();
+int
+main ()
+{
+return GetToken ();
+  ;
+  return 0;
+}
+_ACEOF
+if ac_fn_c_try_link "$LINENO"; then :
+  ac_cv_lib_Useful_GetToken=yes
+else
+  ac_cv_lib_Useful_GetToken=no
+fi
+rm -f core conftest.err conftest.$ac_objext \
+    conftest$ac_exeext conftest.$ac_ext
+LIBS=$ac_check_lib_save_LIBS
+fi
+{ $as_echo "$as_me:${as_lineno-$LINENO}: result: $ac_cv_lib_Useful_GetToken" >&5
+$as_echo "$ac_cv_lib_Useful_GetToken" >&6; }
+if test "x$ac_cv_lib_Useful_GetToken" = xyes; then :
+  cf_have_libUseful=yes
+else
+  cf_have_libUseful=no
+fi
+
+fi
+
+if test "$cf_have_libUseful" = "yes"
+then
+  echo "installed libUseful found, using that instead of bundled libUseful."
+  echo "if you want to use bundled libUseful, force it with --with-libuseful=no"
+  LIBUSEFUL_BUNDLED=""
+
+    { $as_echo "$as_me:${as_lineno-$LINENO}: checking for GetToken in -lUseful" >&5
+$as_echo_n "checking for GetToken in -lUseful... " >&6; }
+if ${ac_cv_lib_Useful_GetToken+:} false; then :
+  $as_echo_n "(cached) " >&6
+else
+  ac_check_lib_save_LIBS=$LIBS
+LIBS="-lUseful  $LIBS"
+cat confdefs.h - <<_ACEOF >conftest.$ac_ext
+/* end confdefs.h.  */
+
+/* Override any GCC internal prototype to avoid an error.
+   Use char because int might match the return type of a GCC
+   builtin and then its argument prototype would still apply.  */
+#ifdef __cplusplus
+extern "C"
+#endif
+char GetToken ();
+int
+main ()
+{
+return GetToken ();
+  ;
+  return 0;
+}
+_ACEOF
+if ac_fn_c_try_link "$LINENO"; then :
+  ac_cv_lib_Useful_GetToken=yes
+else
+  ac_cv_lib_Useful_GetToken=no
+fi
+rm -f core conftest.err conftest.$ac_objext \
+    conftest$ac_exeext conftest.$ac_ext
+LIBS=$ac_check_lib_save_LIBS
+fi
+{ $as_echo "$as_me:${as_lineno-$LINENO}: result: $ac_cv_lib_Useful_GetToken" >&5
+$as_echo "$ac_cv_lib_Useful_GetToken" >&6; }
+if test "x$ac_cv_lib_Useful_GetToken" = xyes; then :
+  cat >>confdefs.h <<_ACEOF
+#define HAVE_LIBUSEFUL 1
+_ACEOF
+
+  LIBS="-lUseful $LIBS"
+
+fi
+
+else
+  LIBUSEFUL_BUNDLED="libUseful/libUseful.a"
+
+
+
+subdirs="$subdirs libUseful"
+
+fi
 
 if test "$cf_use_pam" != "no"
 then
@@ -5003,3 +5119,9 @@ echo "IPv6 enabled"
 fi
 
 
+if test "$cf_have_libUseful" = "yes"
+then
+echo "Using system-wide libUseful"
+else
+echo "Using bundled libUseful"
+fi

@@ -1,8 +1,9 @@
 
 CC = gcc
-VERSION = 0.1
+VERSION = 
 CFLAGS = -g -O2
 LIBS = -lm -lcrypt -lpam 
+STATIC_LIBS=libUseful/libUseful.a
 INSTALL=/bin/install -c
 prefix=/usr/local
 sbindir=${exec_prefix}/sbin
@@ -11,10 +12,11 @@ FLAGS=$(CFLAGS) -DPACKAGE_NAME=\"\" -DPACKAGE_TARNAME=\"\" -DPACKAGE_VERSION=\"\
 OBJ=Authenticate.o common.o telnet-protocol.o settings.o 
 EXE=ptelnetd
 
-all: $(OBJ) main.c
-	@cd libUseful; $(MAKE)
-	$(CC) -g -o$(EXE) $(OBJ) main.c libUseful/libUseful.a $(LIBS)
+all: $(OBJ) $(STATIC_LIBS) main.c
+	$(CC) -g -o$(EXE) $(OBJ) main.c $(STATIC_LIBS) $(LIBS)
 
+libUseful/libUseful.a:
+	$(MAKE) -C libUseful
 
 Authenticate.o: Authenticate.c Authenticate.h
 	$(CC) $(FLAGS) -c Authenticate.c

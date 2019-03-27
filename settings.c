@@ -7,7 +7,7 @@ void PrintVersion()
 {
 fprintf(stdout,"ParanoidTelnetD: version %s\n",VERSION);
 fprintf(stdout,"\nBuilt: %s %s\n",__DATE__,__TIME__);
-fprintf(stdout,"libUseful: Version %s BuildTime: %s\n",LibUsefulGetValue("LibUsefulVersion"), LibUsefulGetValue("LibUsefulBuildTime"));
+fprintf(stdout,"libUseful: Version %s BuildTime: %s\n",LibUsefulGetValue("LibUseful:Version"), LibUsefulGetValue("LibUseful:BuildTime"));
 /*
 if (SSLAvailable()) fprintf(stdout,"SSL Library: %s\n",LibUsefulGetValue("SSL-Library"));
 else fprintf(stdout,"%s\n","SSL Library: None, not compiled with --enable-ssl");
