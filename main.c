@@ -217,7 +217,7 @@ Destroy(Token);
 int LaunchPtyFunc(void *p_Session, int Flags)
 {
 char *Tempstr=NULL;
-int wid, len;
+int wid, len, result;
 void *p_Lua=NULL;
 
 Session=(TSession *) p_Session;
@@ -225,16 +225,14 @@ Session->S=STREAMFromDualFD(0,1);
 
 SetupEnvironment(Session);
 
-if (getuid()==0)
-{
-Tempstr=MCopyStr(Tempstr,"user=",Session->RealUser," ", NULL);
-}
+if (getuid()==0) Tempstr=MCopyStr(Tempstr,"user=",Session->RealUser," ", NULL);
 Tempstr=MCatStr(Tempstr, Settings.ProcessConfig," ",Session->ProcessConfig,NULL);
 
-ProcessApplyConfig(Tempstr);
-Destroy(Tempstr);
+SwitchProgram(Session->Shell, Tempstr);
 
-return(execl(Session->Shell,Session->Shell,NULL));
+//we shouldn't get here if the program launched okay
+Destroy(Tempstr);
+return(FALSE);
 }
 
 
