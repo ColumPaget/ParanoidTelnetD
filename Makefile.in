@@ -46,3 +46,5 @@ install:
 	cp -f ptelnetd $(DESTDIR)/$(sbindir)
 	cp -f ptelnetd.1 $(DESTDIR)/$(mandir)/man1
 
+test:
+	echo "no tests"
