@@ -9,6 +9,9 @@ ptelnetd (Paranoid Telnet Daemon) is a telnet server intended to be used with em
 On linux ptelnetd can authenticate against any combination of it's own auth file, the shadow and password files, or Pluggable Authentication Modules (PAM).
 On freebsd ptelnetd has only been seen to work with it's own auth file (PAM may work, but has not yet been tested).
 
+On linux ptelnetd can use the 'NO_NEW_PRIVS' feature to prevent privilege escalation using apps like 'sudo' or 'su', even if the user knows the 'su' password.
+
+
 # AUTHOR
 
 Author: Colum Paget
@@ -27,20 +30,18 @@ This is free software. It comes with no guarentees and I take no responsiblity i
 # OPTIONS
 
 ```
--?                                Help
--help                             Help
---help                            Help
+-?                                This help
+-help                             This help
+--help                            This help
 -version                          Version info
 --version                         Version info
 -p <port>                         Port to run service on
 -port <port>                      Port to run service on
 -pid-file <path>                  Path to pid file. Can contain variables (See 'VARIABLES') below.
--i <interface>                    Restrict service to a particular network interface (eth0, eth1, etc).
-                                  Thus different ptelnetds with different configs can be set on different interfaces
+-i <interface>                    Restrict service to a particular network interface. Either address or interface (eth0, eth1, etc) for IPv4. Full scoped address for IPv6.
 -D                                Don't demonize/fork into background.
 -nodemon                          Don't demonize/fork into background.
--inetd                            Run from inetd. Treat stdin/stdout as the network connection.
-                                  N.B. NOT ALL OPTIONS WILL WORK WITH THIS. See 'INETD' below.
+-inetd                            Run from inetd. Treat stdin/stdout as the network connection.  N.B. NOT ALL OPTIONS WILL WORK WITH THIS. See 'INETD' below.
 -A <auth methods>                 Comma separated list of authentication methods. See 'AUTHENTICATION' below.
 -auth-methods <auth methods>      Comma separated list of authentication methods. See 'AUTHENTICATION' below.
 -a <path>                         Path to native authentication file. See 'AUTHENTICATION' below.
@@ -56,13 +57,15 @@ This is free software. It comes with no guarentees and I take no responsiblity i
 -allow-macs <MAC addresses>       Comma separated list of ethernet MAC addresses allowed log in.
 -deny-macs <MAC addresses>        Comma separated list of ethernet MAC addresses denied log in.
 -local                            only allow login to 'local' hosts (i.e. those hosts with an entry in the servers arp cache, and so on the same ethernet segment as the host
--non-root                         run server as a user other than root. 'Port' must be set to greater than 1024 and the authentication file must be readable by the current user. Virtual users will run as the current user within the default directory (/var/empty) unless they have home directories specified in the authentication file.
 -tls-cert <path>                  path to tls/ssl certificate file. Setting this will enable TLS/SSL by default and also change the default port to 992
 -tls-key  <path>                  path to tls/ssl key file. You must also supply a -tls-cert argument
+-local                            only allow login to 'local' hosts (i.e. those hosts with an entry in the servers arp cache, and so on the same ethernet segment as the host
+-non-root                         run server as a user other than root. 'Port' must be set to greater than 1024 and the authentication file must be readable by the current user. Virtual users will run as the current user within the default directory (/var/empty) unless they have home directories specified in the authentication file.
 -debug                            Extra logging for debugging
 -error-log-level <syslog level>   syslog level (debug,info,notice,warn,error,crit) to use for error logging
 -info-log-level <syslog level>    syslog level (debug,info,notice,warn,error,crit) to use for informational logging
 -banner <text>                    Text to display when a client connects. 'text' can contain variables. See 'VARIABLES' below.
+-idle <seconds>                   Session idle timeout in seconds.
 -chroot <directory>               Chroot into directory before doing anything else. 'directory' can contain variables. See 'VARIABLES' below.
 -dynhome <directory>              Dynamically generate home directories. 'directory' can contain variables. See 'VARIABLES' below.
 -chhome                           After login chroot into the user's home directory.
@@ -72,12 +75,14 @@ Defaults to /bin/sh, which is overridden by entries in /etc/passwd if system aut
 -real-user                        User to run 'shell' as. This overrides anything set in the authentication files
 -login-script <path>              Script to run to set up user's environment. See 'LOGIN/LOGOUT SCRIPTS' below.
 -logout-script <path>             Script to run to clean up user's environment. See 'LOGIN/LOGOUT SCRIPTS' below.
+-nosu                             Prevent privilege escalation to root for any users.
+-su <group name>                  Only users in specified group are allowed to switch user to root.
 -m <dir list>                     list of directories to 'bind mount' in user's home dir. See 'BIND MOUNTS' below
 -mounts <dir list>                list of directories to 'bind mount' in user's home dir. See 'BIND MOUNTS' below
 -honeypot                         'Honeypot' mode. Fail to authenticate any user, even if they've got the right password, and log EVERYTHING as critical. See 'HONEYPOT MODE' below.
--user add [-a <auth file> <username> <password> [-encrypt <encryption type>] [-home <home directory>] [-shell <shell>] [-conf <config>]' Add a user to the config file. -encrypt sets the type of encryption used to protect the stored password. Default is 'sha1', other options are 'md5', 'sha256' and 'sha512'. '-conf' adds various configurations for that user (chroot, containers, etc).
--user del [-a <auth file> <username> 'Delete a user from the config file.
--user list [-a <auth file>        List users in the config file.
+-user add [-a <auth file>] <username> <password> [-encrypt <encryption type>] [-real-user <username>] [-home <home directory>] [-shell <shell>] [-conf <conf>]                           Add a user to the ptelnetd auth file. See 'NATIVE AUTHENTICATION' below.
+-user del [-a <auth file>] <username> 'Delete a user from the ptelnetd auth file.
+-user list [-a <auth file>]       List users in the ptelnetd auth file.
 ```
 
 
@@ -94,7 +99,7 @@ ptelnetd can use a number of different authentication methods, which can be set 
   cr-sha1     Challenge/Response using native file passwords and sha1 hashing.
   cr-sha256   Challenge/Response using native file passwords and sha256 hashing.
   cr-sha512   Challenge/Response using native file passwords and sha512 hashing.
-	pam-account Authenticate by any means, but check if PAM thinks the account is allowed/valid.
+  pam-account Authenticate by any means, but check if PAM thinks the account is allowed/valid.
   open        NO AUTHENTICATION. This method has certain restrictions.
 ```
 
@@ -109,12 +114,35 @@ ptelnetd can use a number of different authentication methods, which can be set 
 Most authentication methods can be used in combination by listing them as comma-separated values. The only exception is 'open', which must be specified on its own, or it will be ignored
 
 
+# NATIVE AUTHENTICATION
+
+Users can be added to, deleted from, and listed from the 'ptelnetd auth file'. This is a file that holds details of 'virtual users' that ptelnetd knows about. By default this file is at `/etc/ptelnetd.auth` but it's location can be specified using the `-a` command-line option.
+
+Users can be added with:
+
+```
+ptelnetd -user add [-a <auth file>] <username> <password> [-encrypt <encryption type>] [-real-user <username>] [-home <home directory>] [-shell <shell>] [-conf <conf>]
+```
+
+This will be a 'virtual user' that only exists for ptelnetd, so it will need to 'map' to a 'real user' (default is 'nobody').
+
+`-encrypt` sets the type of encryption used to protect the stored password. Default encryption is 'sha1', other options are 'plain', 'md5', 'sha256' and 'sha512'. 
+
+`-home` allows specifying a home-directory for this virtual user.
+
+`-shell` allows specifying a shell, or other program, that the user runs on login.
+
+`-real-user` allows specifying the 'real user' (default 'nobody') that this 'virutal user' runs as.  
+
+`-conf` allows specifying user settings , see 'USER SETTINGS' below
+
+
 
 # USERS and REAL USERS
 
 When using 'native' authentication, ptelentd uses it's own 'users scheme'. 'native' users are 'virtual' users that map to a 'real' user. For instance, there could be 'native' users called 'Tom', 'Dick' and 'Harriet', and they could all run as the real user 'nobody'. Ptelnetd searches for a suitable 'real user' at startup, checking for the existence of the 'nobody', 'guest' or 'daemon' accounts, and using the first one it finds. This behavior can be overridden with the '-real-user' option, which explicitly specifies the user to be used.
 
-When not using 'native' or 'open' authentication, the users are the real users specified in /etc/passwd. However, the '-real-user' command can still be used to switch them to some other user after they've authenticated.
+Virtual users only exist for 'native' authentication. Thus, when not using 'native' or 'open' authentication, any 'users' must be the real users specified in /etc/passwd. However, the '-real-user' command can still be used to switch them to some other user after they've authenticated.
 
 
 
@@ -180,16 +208,8 @@ The '-login-script' and '-logout-script' options allow scripts to be run on logi
 When using 'native' authentication various configurations can be setup against a particular username/password combination. These can be set using the 'ptelnetd -user add -conf' method or, if brave, by editing the .auth file's last field. Configuration options are a space separated list of:
 
 ```
-chroot=<path>     chroot session into <path>
-
-ns=<path>       linux namespace to join. <path> is either a path to a namespace file, or a path to a directory (e.g. /proc/<pid>/ns ) that contains namespace descriptor files
-
-container       this uses linux containers (if supported). It creates a new directory, mounts read-only copies of /bin /lib /usr/lib in it, chroots into it, switches to a new namespace for network (which disallows all network access), IPC, processes, and uname values. 
-                This results in a session that sees no network, no other processes on the system (except for a local 'init' that serves the session) no IPC, and which only has read-only access to a few directories, and write access only to the temporary directory it's living in.
-
-+net            When used in combination with 'container' this allows the container to have normal network access, all other restrictions still apply
-
-nice=value      'nice' value of session
+chroot=<path>    chroot session into <path>
+nice=value       'nice' value of session
 prio=value       scheduling priority of session (equivalent to 0 - nice value)
 priority=value   scheduling priority of session (equivalent to 0 - nice value)
 mem=value        resource limit for memory (data segment) in session
@@ -197,6 +217,12 @@ fsize=value      resource limit for filesize in session
 files=value      resource limit for open files in session
 coredumps=value  resource limit for max size of coredump files in session
 procs=value      resource limit for max number of processes ON A PER USER BASIS.
+nosu             LINUX ONLY: prevent switching user to root. This requires kernel support and must be built-in at compile time.
+ns=<path>        linux namespace to join. <path> is either a path to a namespace file, or a path to a directory (e.g. /proc/<pid>/ns ) that contains namespace descriptor files
+container        this uses linux containers (if supported). It creates a new directory, mounts read-only copies of /bin /lib /usr/lib in it, chroots into it, switches to a new namespace for network (which disallows all network access), IPC, processes, and uname values. This results in a session that sees no network, no other processes on the system (except for a local 'init' that serves the session) no IPC, and which only has read-only access to a few directories, and write access only to the temporary directory it's living in.
++net             When used in combination with 'container' this allows the container to have normal network access, all other restrictions still apply
+
+
 ```
 
 Please note: when using 'container' all your needed libraries must be in /lib or /usr/lib and you'll probably need an /etc/termcap file for the terminal to work correctly.

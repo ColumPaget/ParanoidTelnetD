@@ -13,10 +13,10 @@ OBJ=Authenticate.o common.o telnet-protocol.o settings.o
 EXE=ptelnetd
 
 all: $(OBJ) $(STATIC_LIBS) main.c
-	$(CC) -g -o$(EXE) $(OBJ) main.c $(STATIC_LIBS) $(LIBS)
+	$(CC) -g -o$(EXE) $(FLAGS) $(OBJ) main.c $(STATIC_LIBS) $(LIBS)
 
-libUseful/libUseful.a:
-	$(MAKE) -C libUseful
+libUseful-bundled/libUseful.a:
+	$(MAKE) -C libUseful-bundled
 
 Authenticate.o: Authenticate.c Authenticate.h
 	$(CC) $(FLAGS) -c Authenticate.c
@@ -31,7 +31,7 @@ common.o: common.c common.h
 	$(CC) $(FLAGS) -c common.c
 
 clean:
-	-rm -f *.o */*.o */*.a */*.so $(EXE)
+	-rm -f *.orig *.o */*.o */*.a */*.so $(EXE)
 	-rm -f config.log config.status */config.log */config.status
 	-rm -fr autom4te.cache */autom4te.cache
 

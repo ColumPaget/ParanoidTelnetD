@@ -4,9 +4,7 @@ Installation should be as easy as:
 make
 make install 
 
-If you want IPv6 support then run:
 
-./configure --enable-ip6
-make
-make install
+run './configure --help' to see additional compile-time options like --enable-ssl for SSL/TLS telnets: support.
+
 

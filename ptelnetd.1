@@ -142,6 +142,12 @@ ptelnetd is a telnet server for the paranoid. It\'s intended to be used in those
 -shell <path>                     program/shell to be run after user logs in.
 .TP
 .B
+-nosu                             LINUX ONLY. Prevent switching to root user with 'su' or 'sudo' for all users. Requires kernel support.
+.TP
+.B
+-su <group>                       LINUX ONLY. Only allow users in <group> to switch user to root user with 'su' or 'sudo'. Requires kernel support.
+.TP
+.B
 Defaults to /bin/sh, which is overridden by entries in /etc/passwd if system authentication is being used, which is overridden by this option if this option is active
 .TP
 .B
@@ -163,7 +169,7 @@ Defaults to /bin/sh, which is overridden by entries in /etc/passwd if system aut
 -honeypot                         \'Honeypot\' mode. Fail to authenticate any user, even if they\'ve got the right password, and log EVERYTHING as critical. See \'HONEYPOT MODE\' below.
 .TP
 .B
--user add [-a <auth file> <username> <password> [-encrypt <encryption type>] [-home <home directory>] [-shell <shell>] \'Add a user to the config file. -encrypt sets the type of encryption used to protect the stored password. Default is \'sha1\', other options are \'md5\', \'sha256\' and \'sha512\'.
+-user add [-a <auth file> <username> <password> [-encrypt <encryption type>] [-real-user <user>] [-home <home directory>] [-shell <shell>] \'Add a user to the config file. -encrypt sets the type of encryption used to protect the stored password. Default is \'sha1\', other options are \'md5\', \'sha256\' and \'sha512\'.
 .TP
 .B
 -user del [-a <auth file> <username> \'Delete a user from the config file.
