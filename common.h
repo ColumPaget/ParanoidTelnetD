@@ -7,7 +7,7 @@
 #include "libUseful-5/libUseful.h"
 #endif
 
-#define VERSION "4.3"
+#define VERSION "4.4"
 
 #define ERR_OKAY 0
 #define ERR_FILE 1

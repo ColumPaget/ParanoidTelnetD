@@ -66,6 +66,7 @@ This is free software. It comes with no guarentees and I take no responsiblity i
 -info-log-level <syslog level>    syslog level (debug,info,notice,warn,error,crit) to use for informational logging
 -banner <text>                    Text to display when a client connects. 'text' can contain variables. See 'VARIABLES' below.
 -idle <seconds>                   Session idle timeout in seconds.
+-ttl <hops>                       Time To Live for network packets. Set to '1' to prevent packets leaving local network.
 -chroot <directory>               Chroot into directory before doing anything else. 'directory' can contain variables. See 'VARIABLES' below.
 -dynhome <directory>              Dynamically generate home directories. 'directory' can contain variables. See 'VARIABLES' below.
 -chhome                           After login chroot into the user's home directory.
@@ -247,6 +248,12 @@ IPv6 support is disabled in the default build, but can be built in with 'configu
 # TLS/SSL
 
 TLS/SSL support is disabled in the default build, but can be built with 'configure --enable-ssl'. With SSL support enabled the command-line options -tls-cert and -tls-keyfile can be used to set the certificate and key file for tls, at which point the default port becomes 992 instead of 23 and the connection is encrypted by default.
+
+
+#NETWORK TTL
+
+The `-ttl` option allows specifying how many routers a packet may cross ('hops') before being discarded. If set to '1' this should limit packets to the immediate local network. If operating within a larger network with a known maxiumum hop count (e.g. a network where one has to cross 3 routers to get to the internet) then this value might be set to '3' or '4' to prevent packets reaching the wider internet.
+
 
 # EXAMPLES
 

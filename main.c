@@ -685,10 +685,9 @@ void SetupPidFile()
 {
     char *Tempstr=NULL;
 
-
     Tempstr=SessionSubstituteVars(Tempstr,Settings.PidFile,NULL);
-
     PidFile=WritePidFile(Tempstr);
+
     Destroy(Tempstr);
 }
 
@@ -709,6 +708,8 @@ void PTelnetDServerMode()
         exit(3);
     }
 
+    if (Settings.NetHops > 0) setsockopt(listensock, SOL_IP, IP_TTL, &(Settings.NetHops), sizeof(int));
+
     if (! (Settings.Flags & FLAG_NODEMON)) demonize();
 
     SetupPidFile();
@@ -726,6 +727,10 @@ void PTelnetDServerMode()
         if (FDSelect(listensock, SELECT_READ, NULL))
         {
             fd=IPServerAccept(listensock, &IPStr);
+
+            if (fd > -1)
+            {
+            if (Settings.NetHops > 0) setsockopt(fd, SOL_IP, IP_TTL, &(Settings.NetHops), sizeof(int));
             if (fork()==0)
             {
                 //Sub processes shouldn't keep the pid file open, only the parent server
@@ -756,6 +761,7 @@ void PTelnetDServerMode()
                 _exit(0);
             }
             close(fd);
+            }
         }
         waitpid(-1,NULL,WNOHANG);
     }

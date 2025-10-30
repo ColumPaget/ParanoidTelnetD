@@ -219,8 +219,8 @@ AS_IF([test "$ac_cv_header_shadow_h" != "yes" ], [echo "/etc/shadow authenticati
 AS_IF([test "$cf_use_ip6" != "yes" ], [echo "IPv6 NOT enabled"], [echo "IPv6 enabled"])
 AS_IF([test "$cf_have_libssl" != "yes" ], [echo "SSL/TLS encryption NOT enabled"], [echo "SSL/TLS encryption enabled"])
 AS_IF([test "$cf_have_libUseful" = "yes"], [echo "Using system-wide libUseful"], [echo "Using bundled libUseful"])
-AS_IF([test "$cf_use_nosu" = "yes"], [echo "Using 'no su'"], ["NOT using 'no su'"])
-AS_IF([test "$cf_use_sendfile" = "yes"], [echo "Using sendfile"],["NOT using sendfile"])
-AS_IF([test "$cf_use_fortify" = "yes"], [echo "Compiling with fortify"], ["NOT compiling with fortify"])
-AS_IF([test "$cf_use_stackprotect" = "yes"], [echo "Compiling with stackprotect"], ["NOT compiling with stackprotect"])
+AS_IF([test "$cf_use_nosu" = "yes"], [echo "Using 'no su'"], [echo "NOT using 'no su'"])
+AS_IF([test "$cf_use_sendfile" = "yes"], [echo "Using sendfile"],[echo "NOT using sendfile"])
+AS_IF([test "$cf_use_fortify" = "yes"], [echo "Compiling with fortify"], [echo "NOT compiling with fortify"])
+AS_IF([test "$cf_use_stackprotect" = "yes"], [echo "Compiling with stackprotect"], [echo "NOT compiling with stackprotect"])
 

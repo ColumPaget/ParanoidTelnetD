@@ -1,3 +1,7 @@
+v4.4 (2025-10-30)
+  * added -ttl option to set time-to-live of TCP packets
+  * fix autoconf issues
+
 v4.3 (2025-10-29)
   * Support 'nosu' feature on linux
   * try to use '/bin/bash -login' as the default shell if none specified, or fallback to '/bin/sh -l'

@@ -67,6 +67,7 @@ void SettingsPrintUsage()
     printf("%-33s %s","-info-log-level <syslog level>","syslog level (debug,info,notice,warn,error,crit) to use for informational logging\n");
     printf("%-33s %s","-banner <text>","Text to display when a client connects. 'text' can contain variables. See 'VARIABLES' below.\n");
     printf("%-33s %s","-idle <seconds>","Session idle timeout in seconds.\n");
+    printf("%-33s %s","-ttl <hops>","Time To Live for network packets. Set to '1' to prevent packets leaving local network.\n");
     printf("%-33s %s","-chroot <directory>","Chroot into directory before doing anything else. 'directory' can contain variables. See 'VARIABLES' below.\n");
     printf("%-33s %s","-dynhome <directory>","Dynamically generate home directories. 'directory' can contain variables. See 'VARIABLES' below.\n");
     printf("%-33s %s","-chhome","After login chroot into the user's home directory.\n");
@@ -393,6 +394,7 @@ void SettingsParseCommandLine(int argc, char *argv[])
                 Settings.SUGroup=CopyStr(Settings.SUGroup, argv[++i]);
             }
             else if (strcmp("-idle", argv[i])==0) Settings.IdleTimeout=atoi(argv[++i]);
+            else if (strcmp("-ttl", argv[i])==0) Settings.NetHops=atoi(argv[++i]);
             else if (strcmp("-shell", argv[i])==0)
             {
                 Settings.DefaultShell=CopyStr(Settings.DefaultShell,argv[++i]);

@@ -127,6 +127,12 @@ ptelnetd is a telnet server for the paranoid. It\'s intended to be used in those
 -banner <text>                    Text to display when a client connects. \'text\' can contain variables. See \'VARIABLES\' below.
 .TP
 .B
+-idle <seconds>                   Session idle timeout in seconds.
+.TP
+.B
+-ttl <hops>                       Time To Live for network packets. Set to '1' to prevent packets leaving local network.
+.TP
+.B
 -chroot <directory>               Chroot into directory before doing anything else. \'directory\' can contain variables. See \'VARIABLES\' below.
 .TP
 .B

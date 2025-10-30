@@ -6602,25 +6602,25 @@ if test "$cf_use_nosu" = "yes"
 then :
   echo "Using 'no su'"
 else $as_nop
-  "NOT using 'no su'"
+  echo "NOT using 'no su'"
 fi
 if test "$cf_use_sendfile" = "yes"
 then :
   echo "Using sendfile"
 else $as_nop
-  "NOT using sendfile"
+  echo "NOT using sendfile"
 fi
 if test "$cf_use_fortify" = "yes"
 then :
   echo "Compiling with fortify"
 else $as_nop
-  "NOT compiling with fortify"
+  echo "NOT compiling with fortify"
 fi
 if test "$cf_use_stackprotect" = "yes"
 then :
   echo "Compiling with stackprotect"
 else $as_nop
-  "NOT compiling with stackprotect"
+  echo "NOT compiling with stackprotect"
 fi
 
 

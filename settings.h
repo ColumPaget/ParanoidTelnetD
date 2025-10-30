@@ -37,7 +37,7 @@ int AuthDelay;
 int ErrorLogLevel;
 int InfoLogLevel;
 int IdleTimeout;
-int ChallengeResponse;
+int NetHops;
 } TSettings;
 
 
