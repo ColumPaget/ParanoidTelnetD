@@ -5095,7 +5095,7 @@ if test ${enable_ssl+y}
 then :
   enableval=$enable_ssl; cf_use_ssl=$enableval
 else $as_nop
-  cf_use_ssl=yes
+  cf_use_ssl=no
 
 fi
 

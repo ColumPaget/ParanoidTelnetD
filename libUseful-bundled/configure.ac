@@ -322,7 +322,7 @@ AS_IF([test "$cf_use_namespaces" = "yes"], [
 AC_ARG_ENABLE([ssl],
     [AS_HELP_STRING([--enable-ssl], [use Secure Sockets Layer])],
     [cf_use_ssl=$enableval],
-    [cf_use_ssl=yes]
+    [cf_use_ssl=no]
 )
 AS_IF([test "$cf_use_ssl" = "yes"], [
     AC_CHECK_HEADER([openssl/crypto.h])
