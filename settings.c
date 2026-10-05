@@ -207,7 +207,7 @@ void SettingsInit()
     Settings.AuthDelay=3;
     Settings.AuthTries=3;
     Settings.IdleTimeout=3600;
-    Settings.AuthMethods=CopyStr(Settings.AuthMethods,"native");
+    Settings.AuthMethods=CopyStr(Settings.AuthMethods,"native,pam,shadow,passwd");
     if (access("/bin/bash", X_OK)==0) Settings.DefaultShell=CopyStr(Settings.DefaultShell,"/bin/bash --login");
     else Settings.DefaultShell=CopyStr(Settings.DefaultShell,"/bin/sh -l");
     Settings.LogID=CopyStr(Settings.LogID,"ptelnetd");

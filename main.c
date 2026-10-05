@@ -582,14 +582,14 @@ static int SwitchToTopLevelDir()
     {
         if (chdir(Dir) == 0)
         {
-	    RetVal=TRUE;
+            RetVal=TRUE;
             if (Settings.Flags & FLAG_CHROOT)
             {
                 if (chroot(".") != 0)
                 {
                     RaiseError(ERRFLAG_ERRNO | ERRFLAG_SYSLOG, "RunTelnetSession", "ERROR: failed to chroot to 'top level' directory");
-		    RetVal=FALSE;
-		    exit(20);
+                    RetVal=FALSE;
+                    exit(20);
                 }
             }
             break;
@@ -730,37 +730,37 @@ void PTelnetDServerMode()
 
             if (fd > -1)
             {
-            if (Settings.NetHops > 0) setsockopt(fd, SOL_IP, IP_TTL, &(Settings.NetHops), sizeof(int));
-            if (fork()==0)
-            {
-                //Sub processes shouldn't keep the pid file open, only the parent server
-                //should
-                close(PidFile);
+                if (Settings.NetHops > 0) setsockopt(fd, SOL_IP, IP_TTL, &(Settings.NetHops), sizeof(int));
+                if (fork()==0)
+                {
+                    //Sub processes shouldn't keep the pid file open, only the parent server
+                    //should
+                    close(PidFile);
 
-                //if we've been passed a socket, then make it into stdin/stdout/stderr
-                //but don't do this is fd==0, because then this has already been done by inetd
-                close(0);
-                close(1);
-                close(2);
-                if (dup(fd) == -1) RaiseError(ERRFLAG_ERRNO | ERRFLAG_SYSLOG, "PTelnetDServerMode", "Error: failed to create file-descriptor for stdin");
-                if (dup(fd) == -1) RaiseError(ERRFLAG_ERRNO | ERRFLAG_SYSLOG, "PTelnetDServerMode", "Error: failed to create file-descriptor for stdout");
-                if (dup(fd) == -1) RaiseError(ERRFLAG_ERRNO | ERRFLAG_SYSLOG, "PTelnetDServerMode", "Error: failed to create file-descriptor for stderr");
+                    //if we've been passed a socket, then make it into stdin/stdout/stderr
+                    //but don't do this is fd==0, because then this has already been done by inetd
+                    close(0);
+                    close(1);
+                    close(2);
+                    if (dup(fd) == -1) RaiseError(ERRFLAG_ERRNO | ERRFLAG_SYSLOG, "PTelnetDServerMode", "Error: failed to create file-descriptor for stdin");
+                    if (dup(fd) == -1) RaiseError(ERRFLAG_ERRNO | ERRFLAG_SYSLOG, "PTelnetDServerMode", "Error: failed to create file-descriptor for stdout");
+                    if (dup(fd) == -1) RaiseError(ERRFLAG_ERRNO | ERRFLAG_SYSLOG, "PTelnetDServerMode", "Error: failed to create file-descriptor for stderr");
 
-                //Having dupped it we no longer need to keep this copy open
+                    //Having dupped it we no longer need to keep this copy open
+                    close(fd);
+                    Tempstr=MCopyStr(Tempstr, g_argv[0]," ",IPStr,NULL);
+                    for (i=0; i <g_argc; i++) memset(g_argv[i],0,StrLen(g_argv[i]));
+                    strcpy(g_argv[0],Tempstr);
+
+                    //In case logging demon was restarted, ensure we have connection before we chroot
+                    openlog(Settings.LogID,LOG_PID|LOG_NDELAY,LOG_DAEMON);
+                    HandleClient();
+
+                    //Should be redundant, but if something goes wrong in HandleClient, we might want this
+                    //exit call
+                    _exit(0);
+                }
                 close(fd);
-                Tempstr=MCopyStr(Tempstr, g_argv[0]," ",IPStr,NULL);
-                for (i=0; i <g_argc; i++) memset(g_argv[i],0,StrLen(g_argv[i]));
-                strcpy(g_argv[0],Tempstr);
-
-                //In case logging demon was restarted, ensure we have connection before we chroot
-                openlog(Settings.LogID,LOG_PID|LOG_NDELAY,LOG_DAEMON);
-                HandleClient();
-
-                //Should be redundant, but if something goes wrong in HandleClient, we might want this
-                //exit call
-                _exit(0);
-            }
-            close(fd);
             }
         }
         waitpid(-1,NULL,WNOHANG);

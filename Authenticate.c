@@ -25,7 +25,7 @@ static int CheckServerAllowDenyLists(const char *UserName)
     char *Token=NULL;
     const char *ptr;
 
-    if (StrLen(Settings.DenyUsers))
+    if (StrValid(Settings.DenyUsers))
     {
         ptr=GetToken(Settings.DenyUsers,"\\S",&Token,GETTOKEN_QUOTES);
 
@@ -42,7 +42,7 @@ static int CheckServerAllowDenyLists(const char *UserName)
 
     }
 
-    if (! StrLen(Settings.AllowUsers))
+    if (! StrValid(Settings.AllowUsers))
     {
         Destroy(Token);
         return(TRUE);
@@ -64,7 +64,6 @@ static int CheckServerAllowDenyLists(const char *UserName)
 }
 
 
-
 //Get details like home dir and shell that are stored in the passwd file
 //even if authentication happens against, say, the shadow file
 static void PasswordFileGetDetails(TSession *Session)
@@ -80,6 +79,9 @@ static void PasswordFileGetDetails(TSession *Session)
         Session->RealUser=CopyStr(Session->RealUser, Session->User);
     }
 }
+
+
+
 
 
 static int AuthPasswordFile(TSession *Session)
@@ -108,9 +110,11 @@ static int AuthPasswordFile(TSession *Session)
 }
 
 
+
+
 static int AuthShadowFile(TSession *Session)
 {
-    char *sptr, *eptr, *Salt=NULL, *Digest=NULL;
+    char *Digest=NULL;
     int result=FALSE;
 
 #ifdef HAVE_SHADOW_H
@@ -118,53 +122,27 @@ static int AuthShadowFile(TSession *Session)
     struct spwd *pass_struct=NULL;
 
     AuthenticationsTried=CatStr(AuthenticationsTried,"shadow ");
+
     pass_struct=getspnam(Session->User);
-
-    if (pass_struct==NULL) return(USER_UNKNOWN);
-
-    sptr=pass_struct->sp_pwdp;
+    if (pass_struct == NULL) return(USER_UNKNOWN);
 
 #ifdef HAVE_LIBCRYPT
+    Digest=CopyStr(Digest, crypt(Session->Password, pass_struct->sp_pwdp));
 
-// this is an md5 password
-    if (
-        (StrLen(sptr) > 4) &&
-        (strncmp(sptr,"$1$",3)==0)
-    )
-    {
-        eptr=strchr(sptr+3,'$');
-        Salt=CopyStrLen(Salt,sptr,eptr-sptr);
-
-        Digest=CopyStr(Digest, crypt(Session->Password,Salt));
-
-        if (sptr && (strcmp(Digest,sptr)==0) )
-        {
-            result=TRUE;
-        }
-    }
-    else if (StrLen(Session->Password) && StrLen(pass_struct->sp_pwdp))
-    {
-        // assume old des crypt password
-        sptr=crypt(Session->Password,pass_struct->sp_pwdp);
-        if (sptr && (strcmp(pass_struct->sp_pwdp, sptr)==0))
-        {
-            result=TRUE;
-        }
-    }
-
-
-#endif
-
-    //if we authenticated sucessfully then setup session using details like
-    //homedir and shell from password file
+    if (strcmp(Digest, pass_struct->sp_pwdp)==0) result=TRUE;
     if (result) PasswordFileGetDetails(Session);
+#endif
+
+
 
 #endif
-    Destroy(Salt);
     Destroy(Digest);
 
     return(result);
 }
+
+
+
 
 
 #ifdef HAVE_LIBPAM
@@ -219,8 +197,8 @@ static int PAMStart(TSession *Session, const char *User)
     if (result==PAM_SUCCESS)
     {
         pam_set_item(pamh,PAM_RUSER,Session->User);
-        if (StrLen(Session->ClientHost) > 0) pam_set_item(pamh,PAM_RHOST,Session->ClientHost);
-        else if (StrLen(Session->ClientIP) > 0) pam_set_item(pamh,PAM_RHOST,Session->ClientIP);
+        if (StrValid(Session->ClientHost)) pam_set_item(pamh,PAM_RHOST,Session->ClientHost);
+        else if (StrValid(Session->ClientIP)) pam_set_item(pamh,PAM_RHOST,Session->ClientIP);
         else pam_set_item(pamh,PAM_RHOST,"");
         return(TRUE);
     }
@@ -325,9 +303,9 @@ static int NativeFileCheckPassword(const char *Name, const char *PassType, const
         HashBytes(&Digest, PassType+3, Tempstr, StrLen(Tempstr), ENCODE_HEX);
         if (strcasecmp(Digest,ProvidedPass)==0) result=TRUE;
     }
-    else  if (StrLen(PassType) && StrLen(ProvidedPass))
+    else  if (StrValid(PassType) && StrValid(ProvidedPass))
     {
-        if (StrLen(Salt))
+        if (StrValid(Salt))
         {
             //Salted passwords as of version 1.1.1
             Tempstr=MCopyStr(Tempstr,Name,":",ProvidedPass,":",Salt,NULL);
@@ -336,7 +314,7 @@ static int NativeFileCheckPassword(const char *Name, const char *PassType, const
         //Old-style unsalted passwords
         else HashBytes(&Digest,PassType,ProvidedPass,StrLen(ProvidedPass),ENCODE_HEX);
 
-        if (StrLen(Digest) && (strcmp(Password,Digest)==0)) result=TRUE;
+        if (StrValid(Digest) && (strcmp(Password,Digest)==0)) result=TRUE;
     }
 
     Destroy(Tempstr);
@@ -506,7 +484,64 @@ char *GenerateSalt(char *RetStr, int len)
 }
 
 
-//add or delete users from the native file
+
+//Load a list of existing entries in a file
+static ListNode *NativeFileReadEntries(const char *Path)
+{
+    ListNode *Entries;
+    char *Tempstr=NULL, *Token=NULL;
+    STREAM *S;
+
+    Entries=ListCreate();
+    S=STREAMOpen(Path, "r");
+    if (S)
+    {
+        Tempstr=STREAMReadLine(Tempstr, S);
+        while (Tempstr)
+        {
+            GetToken(Tempstr, ":", &Token, 0);
+            ListAddNamedItem(Entries, Token, CopyStr(NULL, Tempstr));
+
+            Tempstr=STREAMReadLine(Tempstr, S);
+        }
+        STREAMClose(S);
+    }
+
+    Destroy(Tempstr);
+    Destroy(Token);
+
+    return(Entries);
+}
+
+
+static void UpdateNativeFileAddNewEntry(STREAM *S, const char *Name, const char *PassType, const char *Pass, const char *RealUser, const char *HomeDir, const char *Shell, const char *Args)
+{
+    char *Token=NULL, *Salt=NULL, *Tempstr=NULL;
+
+    //Do this or else HashBytes appends
+    Token=CopyStr(Token,"");
+    if (strcmp(PassType,"plain") == 0) Token=CopyStr(Token, Pass);
+    else if (strcmp(PassType,"otp") == 0) Token=CopyStr(Token, Pass);
+    else
+    {
+        Salt=GenerateSalt(Salt,16);
+        Token=MCopyStr(Token, Name, ":", Pass, ":", Salt,NULL);
+        HashBytes(&Tempstr, PassType, Token, StrLen(Token), ENCODE_BASE64);
+        Token=MCopyStr(Token,Salt,"$",Tempstr,NULL);
+    }
+
+    Tempstr=MCopyStr(Tempstr,Name,":",PassType,":",Token,":",RealUser,":",HomeDir,":",Shell,":",Args,"\n",NULL);
+    STREAMWriteLine(Tempstr,S);
+
+    if (getuid()==0) SwitchUser(RealUser);
+    mkdir(HomeDir,0770);
+
+    Destroy(Tempstr);
+    Destroy(Token);
+    Destroy(Salt);
+}
+
+
 static int UpdateNativeFile(const char *Path, const char *Name, const char *PassType, const char *Pass, const char *HomeDir, const char *RealUser, const char *Shell, const char *Args, int Action)
 {
     STREAM *S;
@@ -514,25 +549,12 @@ static int UpdateNativeFile(const char *Path, const char *Name, const char *Pass
     char *Tempstr=NULL, *Token=NULL, *Salt=NULL;
     int RetVal=FALSE;
     ListNode *Curr;
+    int exists=FALSE;
 
-    Entries=ListCreate();
+    Entries=NativeFileReadEntries(Path);
     MakeDirPath(Path, 0700);
-    S=STREAMOpen(Path,"r");
-    if (S)
-    {
-        Tempstr=STREAMReadLine(Tempstr,S);
-        while (Tempstr)
-        {
-            GetToken(Tempstr,":",&Token,0);
-            if (strcmp(Token, Name) != 0) ListAddNamedItem(Entries,Token,CopyStr(NULL,Tempstr));
 
-            Tempstr=STREAMReadLine(Tempstr,S);
-        }
-        STREAMClose(S);
-    }
-
-
-    if (StrLen(Path))
+    if (StrValid(Path))
     {
         S=STREAMOpen(Path,"w");
         if (S)
@@ -541,7 +563,9 @@ static int UpdateNativeFile(const char *Path, const char *Name, const char *Pass
             Curr=ListGetNext(Entries);
             while (Curr)
             {
-                STREAMWriteLine((char *) Curr->Item, S);
+                //don't copy an entry that matches 'Name', was we are either deleting or updating that one
+                if ( strcmp(Curr->Tag, Name) != 0) STREAMWriteLine((char *) Curr->Item, S);
+                else exists=TRUE;
                 Curr=ListGetNext(Curr);
             }
             STREAMFlush(S);
@@ -550,31 +574,18 @@ static int UpdateNativeFile(const char *Path, const char *Name, const char *Pass
             if (Action==NATIVEFILE_USER_DEL)
             {
                 //Don't bother to write new entry, effectively deleting user
+                if (exists) RetVal=TRUE;
             }
-            else //WriteNew Entry
+            else
             {
-                //Do this or else HashBytes appends
-                Token=CopyStr(Token,"");
-                if (strcmp(PassType,"plain") == 0) Token=CopyStr(Token,Pass);
-                else
+                //            if (exists)
                 {
-                    Salt=GenerateSalt(Salt,16);
-                    Token=MCopyStr(Token,Name,":",Pass,":",Salt,NULL);
-                    HashBytes(&Tempstr, PassType, Token, StrLen(Token), ENCODE_BASE64);
-                    Token=MCopyStr(Token,Salt,"$",Tempstr,NULL);
+                    UpdateNativeFileAddNewEntry(S, Name, PassType, Pass, RealUser, HomeDir, Shell, Args);
+                    RetVal=TRUE;
                 }
-                Tempstr=MCopyStr(Tempstr,Name,":",PassType,":",Token,":",RealUser,":",HomeDir,":",Shell,":",Args,"\n",NULL);
-
-                STREAMWriteLine(Tempstr,S);
-
-                //when we create a user, we also create their home directory
-                //we do this as the user to get the righ permissions
-                if (getuid()==0) SwitchUser(RealUser);
-                mkdir(HomeDir,0770);
             }
 
             STREAMClose(S);
-            RetVal=TRUE;
         }
     }
 
@@ -695,7 +706,7 @@ int Authenticate(TSession *Session)
 
     if (result)
     {
-        if (! StrLen(Session->RealUser))
+        if (! StrValid(Session->RealUser))
         {
             syslog(Settings.ErrorLogLevel,"No 'RealUser' set for '%s'. Login Denied",Session->User);
             result=FALSE;
@@ -706,10 +717,10 @@ int Authenticate(TSession *Session)
             if (pwent)
             {
                 Session->RealUserUID=pwent->pw_uid;
-                if (! StrLen(Session->HomeDir)) Session->HomeDir=CopyStr(Session->HomeDir,pwent->pw_dir);
+                if (! StrValid(Session->HomeDir)) Session->HomeDir=CopyStr(Session->HomeDir,pwent->pw_dir);
             }
 
-            if (! StrLen(Session->HomeDir))
+            if (! StrValid(Session->HomeDir))
             {
                 syslog(Settings.ErrorLogLevel,"No 'HomeDir' set for '%s'. Login Denied",Session->User);
                 result=FALSE;

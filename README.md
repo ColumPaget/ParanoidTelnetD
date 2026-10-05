@@ -89,10 +89,10 @@ Defaults to /bin/sh, which is overridden by entries in /etc/passwd if system aut
 
 # AUTHENTICATION
 
-ptelnetd can use a number of different authentication methods, which can be set with the '-auth-types' command line option. Available types are: 
+ptelnetd can use a number of different authentication methods, which can be set/limited with the '-auth-types' command line option. By default ptelnetd will try 'native,pam,shadow,passwd'. Available types are: 
 
 ```
-  native     The default method. Uses ptelnetd's native authentication file (specified with -auth-file, defaults to /etc/ptelnetd.auth) to authenticate.
+  native      ptelnetd's native authentication file (specified with -auth-file, defaults to /etc/ptelnetd.auth) to authenticate.
   pam         Use Pluggable Authentication Modules.
   shadow      Authenticate against passwords in /etc/shadow.
   passwd      Authenticate against passwords in /etc/passwd.

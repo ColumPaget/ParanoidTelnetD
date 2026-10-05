@@ -1,3 +1,7 @@
+V4.5 (2026-10-04)
+  * Various authentication fixes
+  * support all authentication types by default, instead of just 'native'
+
 v4.4 (2025-10-30)
   * added -ttl option to set time-to-live of TCP packets
   * fix autoconf issues
